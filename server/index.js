@@ -1,5 +1,8 @@
 const express = require("express");
+require("dotenv").config();
 const app = express();
+const conn = require("./conn/db");
+
 const PORT = 3000;
 
 app.get("/", (req, res) => {
