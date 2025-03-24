@@ -5,6 +5,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Home from "./pages/Home";
 import MapComponent from "./components/location/Maps";
 import WorkerList from "./pages/WorkerList";
+import HiringPage from "./pages/HiringPage";
 
 function App() {
   return (
@@ -16,6 +17,7 @@ function App() {
           <Route path="/signup" element={<SignUp />} />
           <Route path="/location" element={<MapComponent />} />
           <Route path="/workers" element={<WorkerList />} />
+          <Route path="/hiring" element={<HiringPage />} />
         </Routes>
       </BrowserRouter>
     </main>

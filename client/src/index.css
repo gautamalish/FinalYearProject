@@ -1,3 +1,10 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+.filter {
+  height: 150px;
+}
+.worker {
+  height: 150px;
+}
