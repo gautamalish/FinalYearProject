@@ -1,124 +1,236 @@
-import React, { useContext, useState } from "react";
-import { FaArrowRight } from "react-icons/fa6";
-import googleIcon from "../assets/googleIcon.png";
+import React, { useState } from "react";
+import {
+  FaArrowRight,
+  FaGoogle,
+  FaUser,
+  FaPhone,
+  FaEnvelope,
+  FaLock,
+} from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
-import { AuthContext } from "../contexts/AuthContext";
-import { createUserWithEmailAndPassword } from "firebase/auth";
 import { auth } from "../config/firebase-config";
 import { getAuth, GoogleAuthProvider, signInWithPopup } from "firebase/auth";
+
 const SignUp = () => {
   const navigate = useNavigate();
-  const { signUp } = useContext(AuthContext);
-  // state to hold input fields data
   const [formData, setFormData] = useState({
     name: "",
-    "Ph.No": "",
+    phone: "",
     email: "",
     password: "",
   });
-  function handleFormData(e) {
+  const [isLoading, setIsLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const handleFormData = (e) => {
     setFormData((prevData) => ({
       ...prevData,
       [e.target.name]: e.target.value,
     }));
-  }
-  // Handling the form Submit and registering the user
-  function handleSubmit(e) {
+  };
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    setIsLoading(true);
+    setError("");
     try {
-      createUserWithEmailAndPassword(auth, formData.email, formData.password);
-      const user = auth.currentUser;
-      console.log(user);
-      console.log("User registered Successfully");
+      await createUserWithEmailAndPassword(
+        auth,
+        formData.email,
+        formData.password
+      );
       navigate("/");
     } catch (error) {
-      console.log(error.message);
+      setError(error.message);
+    } finally {
+      setIsLoading(false);
     }
-  }
+  };
 
   const signUpWithGoogle = () => {
+    setGoogleLoading(true);
+    setError("");
     const auth = getAuth();
     const provider = new GoogleAuthProvider();
+
     signInWithPopup(auth, provider)
-      .then((result) => {
-        console.log("User signed in: ", result.user);
+      .then(() => {
         navigate("/");
       })
       .catch((error) => {
-        console.error("Error during sign-in ", error.message);
+        if (
+          error.code !== "auth/cancelled-popup-request" &&
+          error.code !== "auth/popup-closed-by-user"
+        ) {
+          setError(error.message);
+        }
+      })
+      .finally(() => {
+        setGoogleLoading(false);
       });
   };
+
   return (
-    <div className="m-auto w-4/5 border border-blue-500 flex items-center flex-col ">
-      <div className="mt-14">
-        <h1 className="text-4xl flex justify-center items-center">
-          <span className="text-gold">Hire</span>Me
-        </h1>
-        <h3 className="text-2xl mt-10">Create a new Account</h3>
-      </div>
-      <form className="flex flex-col items-center gap-3 mt-3 w-full">
-        <input
-          type="text"
-          placeholder="Name"
-          className="border border-gray-500 rounded-2xl p-1.5 w-3/12"
-          onChange={handleFormData}
-          value={formData.name}
-          name="name"
-        />
-        <input
-          type="text"
-          placeholder="Phone Number"
-          className="border border-gray-500 rounded-2xl p-1.5 w-3/12"
-          onChange={handleFormData}
-          value={formData["Ph.No"]}
-          name="Ph.No"
-        />
-        <input
-          type="email"
-          placeholder="Email"
-          className="border border-gray-500 rounded-2xl p-1.5 w-3/12"
-          onChange={handleFormData}
-          value={formData.email}
-          name="email"
-        />
-        <input
-          type="password"
-          placeholder="Password"
-          className="border border-gray-500 rounded-2xl p-1.5 w-3/12"
-          onChange={handleFormData}
-          value={formData.password}
-          name="password"
-        />
-        <div className="w-1/4 flex justify-end mt-3">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-50 py-12 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-md w-full bg-white rounded-2xl shadow-xl overflow-hidden p-8 space-y-6">
+        {/* Logo Header */}
+        <div className="text-center">
+          <h1 className="text-4xl font-bold text-gray-900">
+            <span className="text-yellow-400">Hire</span>Me
+          </h1>
+          <h2 className="mt-4 text-2xl font-semibold text-gray-800">
+            Create your account
+          </h2>
+          <p className="mt-2 text-gray-500 text-sm">
+            Join thousands of professionals and clients
+          </p>
+        </div>
+
+        {/* Error Message */}
+        {error && (
+          <div className="bg-red-50 text-red-600 p-3 rounded-lg text-sm">
+            {error}
+          </div>
+        )}
+
+        {/* Form */}
+        <form className="mt-6 space-y-4" onSubmit={handleSubmit}>
+          <div className="relative">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <FaUser className="text-gray-400" />
+            </div>
+            <input
+              type="text"
+              placeholder="Full Name"
+              className="pl-10 appearance-none relative block w-full px-3 py-3 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+              onChange={handleFormData}
+              value={formData.name}
+              name="name"
+              required
+            />
+          </div>
+
+          <div className="relative">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <FaPhone className="text-gray-400" />
+            </div>
+            <input
+              type="tel"
+              placeholder="Phone Number"
+              className="pl-10 appearance-none relative block w-full px-3 py-3 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+              onChange={handleFormData}
+              value={formData.phone}
+              name="phone"
+              required
+            />
+          </div>
+
+          <div className="relative">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <FaEnvelope className="text-gray-400" />
+            </div>
+            <input
+              type="email"
+              placeholder="Email Address"
+              className="pl-10 appearance-none relative block w-full px-3 py-3 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+              onChange={handleFormData}
+              value={formData.email}
+              name="email"
+              required
+            />
+          </div>
+
+          <div className="relative">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <FaLock className="text-gray-400" />
+            </div>
+            <input
+              type="password"
+              placeholder="Password"
+              className="pl-10 appearance-none relative block w-full px-3 py-3 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+              onChange={handleFormData}
+              value={formData.password}
+              name="password"
+              required
+              minLength="6"
+            />
+          </div>
+
+          <div className="flex items-center">
+            <input
+              id="terms"
+              name="terms"
+              type="checkbox"
+              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+              required
+            />
+            <label htmlFor="terms" className="ml-2 block text-sm text-gray-700">
+              I agree to the{" "}
+              <span className="text-blue-600 hover:text-blue-500 cursor-pointer">
+                Terms of Service
+              </span>{" "}
+              and{" "}
+              <span className="text-blue-600 hover:text-blue-500 cursor-pointer">
+                Privacy Policy
+              </span>
+            </label>
+          </div>
+
           <button
-            className="bg-gold w-24 h-12 rounded-3xl flex justify-center items-center"
-            onClick={handleSubmit}
+            type="submit"
+            disabled={isLoading}
+            className="group relative w-full flex justify-center items-center py-3 px-4 border border-transparent text-sm font-medium rounded-lg text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-300"
           >
-            <FaArrowRight size={30} color="white" />
+            {isLoading ? (
+              "Creating account..."
+            ) : (
+              <>
+                Continue
+                <FaArrowRight className="ml-2" />
+              </>
+            )}
+          </button>
+        </form>
+
+        {/* Divider */}
+        <div className="relative">
+          <div className="absolute inset-0 flex items-center">
+            <div className="w-full border-t border-gray-300" />
+          </div>
+          <div className="relative flex justify-center text-sm">
+            <span className="px-2 bg-white text-gray-500">Or sign up with</span>
+          </div>
+        </div>
+
+        {/* Google Sign Up */}
+        <div>
+          <button
+            onClick={signUpWithGoogle}
+            disabled={googleLoading}
+            className="w-full flex items-center justify-center gap-2 py-3 px-4 border border-gray-300 rounded-lg bg-white text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-300"
+          >
+            {googleLoading ? (
+              "Signing up..."
+            ) : (
+              <>
+                <FaGoogle className="text-red-500" />
+                Sign up with Google
+              </>
+            )}
           </button>
         </div>
-      </form>
-      <div className="flex w-1/4 items-center justify-end mt-3">
-        <p className="underline cursor-pointer">Forgot Password?</p>
-      </div>
-      <div className="mt-3">
-        <p className="flex justify-center">Or</p>
-        <button
-          className="border border-gray-400 rounded-lg flex items-center gap-1 p-2 m-auto mt-3"
-          onClick={signUpWithGoogle}
-        >
-          <img src={googleIcon} alt="GoogleImage" width="24px" />
-          Sign Up With Google
-        </button>
-        <p className="mt-3 ">
-          Already have an account?
-          <span
-            className="underline cursor-pointer"
+
+        {/* Login Link */}
+        <div className="text-center text-sm text-gray-600">
+          Already have an account?{" "}
+          <button
             onClick={() => navigate("/signin")}
+            className="font-medium text-blue-600 hover:text-blue-500"
           >
-            Login
-          </span>
-        </p>
+            Sign in
+          </button>
+        </div>
       </div>
     </div>
   );
