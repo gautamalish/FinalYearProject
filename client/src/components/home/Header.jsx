@@ -1,34 +1,72 @@
 import React from "react";
-import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { FaSearch } from "react-icons/fa";
+
 const Header = () => {
   const navigate = useNavigate();
+
   return (
-    <div>
-      <nav className="bg-gray-500 flex justify-between p-5 items-center sticky top-0">
-        <p
-          className="text-2xl font-medium cursor-pointer"
+    <header className="bg-gradient-to-r from-blue-600 to-indigo-700 shadow-lg sticky top-0 w-full z-50">
+      <nav className="max-w-[100rem] mx-auto flex justify-between items-center p-4 sm:p-5 lg:p-6">
+        {/* Logo */}
+        <div
+          className="flex items-center cursor-pointer group"
           onClick={() => navigate("/")}
         >
-          <span className="text-yellow-400">Hire</span>Me
-        </p>
-        <div className="w-2/3 text-center">
+          <p className="text-3xl font-bold text-white group-hover:opacity-90 transition">
+            <span className="text-yellow-300">Hire</span>Me
+          </p>
+        </div>
+
+        {/* Search bar - Hidden on small screens */}
+        <div className="hidden sm:flex items-center bg-white/90 rounded-xl px-4 py-2 shadow-sm w-1/3 max-w-xl hover:shadow-md transition-all">
+          <FaSearch className="text-gray-500 mr-2" />
           <input
             type="text"
-            placeholder="Search"
-            className="rounded-md p-1 w-1/3"
+            placeholder="Find services or professionals..."
+            className="w-full outline-none bg-transparent text-gray-700 placeholder-gray-400"
           />
         </div>
-        <div className="flex gap-5">
-          <button className="text-white" onClick={() => navigate("/signup")}>
+
+        {/* Navigation Links */}
+        <div className="hidden md:flex items-center gap-6 text-white font-medium">
+          <button
+            onClick={() => navigate("/services")}
+            className="hover:text-yellow-300 transition-colors"
+          >
+            Services
+          </button>
+          <button
+            onClick={() => navigate("/professionals")}
+            className="hover:text-yellow-300 transition-colors"
+          >
+            Professionals
+          </button>
+          <button
+            onClick={() => navigate("/about")}
+            className="hover:text-yellow-300 transition-colors"
+          >
+            About
+          </button>
+        </div>
+
+        {/* Auth Buttons */}
+        <div className="flex gap-3">
+          <button
+            className="px-4 py-2 rounded-lg bg-yellow-400 text-gray-900 font-semibold hover:bg-yellow-500 transition-all shadow-md hover:shadow-lg"
+            onClick={() => navigate("/signup")}
+          >
             Sign Up
           </button>
-          <button className="text-white" onClick={() => navigate("/signin")}>
+          <button
+            className="px-4 py-2 rounded-lg bg-white/10 text-white font-semibold border border-white hover:bg-white/20 transition-all"
+            onClick={() => navigate("/signin")}
+          >
             Log In
           </button>
         </div>
       </nav>
-    </div>
+    </header>
   );
 };
 
