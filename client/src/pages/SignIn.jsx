@@ -1,105 +1,205 @@
 import React, { useState } from "react";
-import { FaArrowRight } from "react-icons/fa6";
-import googleIcon from "../assets/googleIcon.png";
-import "firebase/auth";
+import { FaArrowRight, FaGoogle } from "react-icons/fa";
+import { useNavigate } from "react-router-dom";
+import { auth } from "../config/firebase-config";
 import {
   getAuth,
   GoogleAuthProvider,
   signInWithEmailAndPassword,
   signInWithPopup,
 } from "firebase/auth";
-import { useNavigate } from "react-router-dom";
-import { auth } from "../config/firebase-config";
+
 const SignIn = () => {
   const navigate = useNavigate();
   const [formData, setFormData] = useState({ email: "", password: "" });
+  const [isLoading, setIsLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
+  const [error, setError] = useState("");
+
   function handleInputChange(e) {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
   }
+
   const loginWithGoogle = () => {
+    setGoogleLoading(true);
+    setError("");
     const auth = getAuth();
     const provider = new GoogleAuthProvider();
+
     signInWithPopup(auth, provider)
-      .then((result) => {
-        console.log("User signed in: ", result.user);
+      .then(() => {
         navigate("/");
       })
       .catch((error) => {
-        console.error("Error during sign-in ", error.message);
+        if (
+          error.code !== "auth/cancelled-popup-request" &&
+          error.code !== "auth/popup-closed-by-user"
+        ) {
+          setError(error.message);
+        }
+      })
+      .finally(() => {
+        setGoogleLoading(false);
       });
   };
 
   async function handleSubmit(e) {
     e.preventDefault();
+    setIsLoading(true);
+    setError("");
     try {
       await signInWithEmailAndPassword(auth, formData.email, formData.password);
-      console.log("User Logged In Successfully");
       navigate("/");
     } catch (error) {
-      console.log(error.message);
+      setError(error.message);
+    } finally {
+      setIsLoading(false);
     }
   }
+
   return (
-    <div className="m-auto w-4/5 border border-blue-500 flex items-center flex-col ">
-      <div className="mt-14">
-        <h1 className="text-4xl flex justify-center items-center">
-          <span className="text-gold">Hire</span>Me
-        </h1>
-        <h3 className="text-2xl mt-10">Sign In to your Account</h3>
-      </div>
-      <form className="w-full">
-        <div className="flex flex-col items-center gap-3 mt-3 w-full">
-          <input
-            type="text"
-            placeholder="Email"
-            className="border border-gray-500 rounded-2xl p-1.5 w-3/12 max-md:w-full"
-            name="email"
-            value={formData.email}
-            onChange={handleInputChange}
-          />
-          <input
-            type="text"
-            placeholder="Password"
-            className="border border-gray-500 rounded-2xl p-1.5 w-3/12 max-md:w-full"
-            name="password"
-            value={formData.password}
-            onChange={handleInputChange}
-          />
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-md w-full bg-white rounded-2xl shadow-xl overflow-hidden p-8 space-y-8">
+        {/* Logo Header */}
+        <div className="text-center">
+          <h1 className="text-4xl font-bold text-gray-900">
+            <span className="text-yellow-400">Hire</span>Me
+          </h1>
+          <h2 className="mt-6 text-2xl font-semibold text-gray-800">
+            Sign in to your account
+          </h2>
         </div>
-      </form>
-      <div className="max-md:w-1/2 w-1/4 items-center justify-end mt-3 border border-blue-700 relative flex ml-auto">
-        <p className="underline cursor-pointer border border-red-500">
-          Forgot Password?
-        </p>
-      </div>
-      <div className="max-md:w-full w-1/4 flex justify-end mt-3">
-        <button
-          className="bg-gold w-24 h-12 rounded-3xl flex justify-center items-center"
-          onClick={handleSubmit}
-        >
-          <FaArrowRight size={30} color="white" />
-        </button>
-      </div>
-      <div className="mt-3">
-        <p className="flex justify-center">Or</p>
-        <button
-          className="border border-gray-400 rounded-lg flex items-center gap-1 p-2 m-auto mt-3"
-          onClick={loginWithGoogle}
-        >
-          <img src={googleIcon} alt="GoogleImage" width="24px" />
-          Sign In With Google
-        </button>
-        <p className="mt-3 ">
-          Don't have an account?
-          <span
-            className="underline cursor-pointer"
-            onClick={() => navigate("/signup")}
+
+        {/* Error Message */}
+        {error && (
+          <div className="bg-red-50 text-red-600 p-3 rounded-lg text-sm">
+            {error}
+          </div>
+        )}
+
+        {/* Form */}
+        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
+          <div className="rounded-md shadow-sm space-y-4">
+            <div>
+              <label htmlFor="email" className="sr-only">
+                Email address
+              </label>
+              <input
+                id="email"
+                name="email"
+                type="email"
+                autoComplete="email"
+                required
+                className="appearance-none relative block w-full px-4 py-3 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm"
+                placeholder="Email address"
+                value={formData.email}
+                onChange={handleInputChange}
+              />
+            </div>
+            <div>
+              <label htmlFor="password" className="sr-only">
+                Password
+              </label>
+              <input
+                id="password"
+                name="password"
+                type="password"
+                autoComplete="current-password"
+                required
+                className="appearance-none relative block w-full px-4 py-3 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm"
+                placeholder="Password"
+                value={formData.password}
+                onChange={handleInputChange}
+              />
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between">
+            <div className="flex items-center">
+              <input
+                id="remember-me"
+                name="remember-me"
+                type="checkbox"
+                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+              />
+              <label
+                htmlFor="remember-me"
+                className="ml-2 block text-sm text-gray-700"
+              >
+                Remember me
+              </label>
+            </div>
+
+            <div className="text-sm">
+              <button
+                type="button"
+                className="font-medium text-blue-600 hover:text-blue-500"
+                onClick={() => navigate("/forgot-password")}
+              >
+                Forgot password?
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="group relative w-full flex justify-center items-center py-3 px-4 border border-transparent text-sm font-medium rounded-lg text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-300"
+            >
+              {isLoading ? (
+                "Signing in..."
+              ) : (
+                <>
+                  Sign in
+                  <FaArrowRight className="ml-2" />
+                </>
+              )}
+            </button>
+          </div>
+        </form>
+
+        {/* Divider */}
+        <div className="relative">
+          <div className="absolute inset-0 flex items-center">
+            <div className="w-full border-t border-gray-300" />
+          </div>
+          <div className="relative flex justify-center text-sm">
+            <span className="px-2 bg-white text-gray-500">
+              Or continue with
+            </span>
+          </div>
+        </div>
+
+        {/* Google Sign In */}
+        <div>
+          <button
+            onClick={loginWithGoogle}
+            disabled={googleLoading}
+            className="w-full flex items-center justify-center gap-2 py-3 px-4 border border-gray-300 rounded-lg bg-white text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-300"
           >
-            {" "}
-            Create
-          </span>
-        </p>
+            {googleLoading ? (
+              "Signing in..."
+            ) : (
+              <>
+                <FaGoogle className="text-red-500" />
+                Sign in with Google
+              </>
+            )}
+          </button>
+        </div>
+
+        {/* Sign Up Link */}
+        <div className="text-center text-sm text-gray-600">
+          Don't have an account?{" "}
+          <button
+            onClick={() => navigate("/signup")}
+            className="font-medium text-blue-600 hover:text-blue-500"
+          >
+            Create one
+          </button>
+        </div>
       </div>
     </div>
   );
