@@ -10,6 +10,8 @@ import {
 import { useNavigate } from "react-router-dom";
 import { auth } from "../config/firebase-config";
 import { getAuth, GoogleAuthProvider, signInWithPopup } from "firebase/auth";
+import { createUserWithEmailAndPassword } from "firebase/auth";
+import axios from "axios";
 
 const SignUp = () => {
   const navigate = useNavigate();
@@ -32,43 +34,61 @@ const SignUp = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setIsLoading(true);
-    setError("");
     try {
-      await createUserWithEmailAndPassword(
+      // 1. Firebase Authentication
+      const auth = getAuth();
+      const userCredential = await createUserWithEmailAndPassword(
         auth,
         formData.email,
         formData.password
       );
+      const user = userCredential.user;
+      const token = await user.getIdToken();
+
+      // 2. Save to MongoDB
+      await axios.post("http://localhost:3000/api/users", {
+        token,
+        name: formData.name,
+        email: formData.email,
+        phone: formData.phone,
+      });
+
       navigate("/");
     } catch (error) {
-      setError(error.message);
-    } finally {
-      setIsLoading(false);
+      console.error("Error:", error.message);
     }
   };
 
-  const signUpWithGoogle = () => {
+  const signUpWithGoogle = async () => {
     setGoogleLoading(true);
     setError("");
     const auth = getAuth();
     const provider = new GoogleAuthProvider();
 
-    signInWithPopup(auth, provider)
-      .then(() => {
-        navigate("/");
-      })
-      .catch((error) => {
-        if (
-          error.code !== "auth/cancelled-popup-request" &&
-          error.code !== "auth/popup-closed-by-user"
-        ) {
-          setError(error.message);
-        }
-      })
-      .finally(() => {
-        setGoogleLoading(false);
+    try {
+      const result = await signInWithPopup(auth, provider);
+      const user = result.user;
+      const token = await user.getIdToken(); // Get Firebase ID token
+
+      // Send user data to backend
+      await axios.post("http://localhost:3000/api/users", {
+        token,
+        name: user.displayName,
+        email: user.email,
+        phone: user.phoneNumber || "", // Google might not provide a phone number
       });
+
+      navigate("/");
+    } catch (error) {
+      if (
+        error.code !== "auth/cancelled-popup-request" &&
+        error.code !== "auth/popup-closed-by-user"
+      ) {
+        setError(error.message);
+      }
+    } finally {
+      setGoogleLoading(false);
+    }
   };
 
   return (

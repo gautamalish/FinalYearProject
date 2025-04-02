@@ -10,6 +10,7 @@ import {
 } from "react-icons/fa";
 import { BsPersonCheckFill } from "react-icons/bs";
 import { IoLocation } from "react-icons/io5";
+import Home from "./Home";
 
 const HiringPage = () => {
   return (

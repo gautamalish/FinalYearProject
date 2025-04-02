@@ -6,6 +6,7 @@ import Home from "./pages/Home";
 import MapComponent from "./components/location/Maps";
 import WorkerList from "./pages/WorkerList";
 import HiringPage from "./pages/HiringPage";
+import AdminDashboard from "./pages/AdminDashboard";
 
 function App() {
   return (
@@ -18,6 +19,7 @@ function App() {
           <Route path="/location" element={<MapComponent />} />
           <Route path="/workers" element={<WorkerList />} />
           <Route path="/hiring" element={<HiringPage />} />
+          <Route path="/admin" element={<AdminDashboard />} />
         </Routes>
       </BrowserRouter>
     </main>
