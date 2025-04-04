@@ -7,6 +7,7 @@ import MapComponent from "./components/location/Maps";
 import WorkerList from "./pages/WorkerList";
 import HiringPage from "./pages/HiringPage";
 import AdminDashboard from "./pages/AdminDashboard";
+import ProtectedAdminRoute from "./components/ProtectedAdmin";
 
 function App() {
   return (
@@ -19,7 +20,14 @@ function App() {
           <Route path="/location" element={<MapComponent />} />
           <Route path="/workers" element={<WorkerList />} />
           <Route path="/hiring" element={<HiringPage />} />
-          <Route path="/admin" element={<AdminDashboard />} />
+          <Route
+            path="/admin"
+            element={
+              <ProtectedAdminRoute>
+                <AdminDashboard />
+              </ProtectedAdminRoute>
+            }
+          />
         </Routes>
       </BrowserRouter>
     </main>

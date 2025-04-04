@@ -1,7 +1,8 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { FaArrowRight, FaGoogle } from "react-icons/fa";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { auth } from "../config/firebase-config";
+import axios from "axios";
 import {
   getAuth,
   GoogleAuthProvider,
@@ -11,56 +12,130 @@ import {
 
 const SignIn = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [formData, setFormData] = useState({ email: "", password: "" });
   const [isLoading, setIsLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [verifyingAdmin, setVerifyingAdmin] = useState(false);
   const [error, setError] = useState("");
+  const from = location.state?.from?.pathname || "/";
 
-  function handleInputChange(e) {
+  // Auto-refresh token every 55 minutes
+  useEffect(() => {
+    const timer = setInterval(async () => {
+      if (auth.currentUser) {
+        try {
+          const token = await auth.currentUser.getIdToken(true);
+          localStorage.setItem("token", token);
+        } catch (error) {
+          console.error("Token refresh failed:", error);
+        }
+      }
+    }, 55 * 60 * 1000); // 55 minutes
+
+    return () => clearInterval(timer);
+  }, []);
+
+  const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
-  }
-
-  const loginWithGoogle = () => {
-    setGoogleLoading(true);
-    setError("");
-    const auth = getAuth();
-    const provider = new GoogleAuthProvider();
-
-    signInWithPopup(auth, provider)
-      .then(() => {
-        navigate("/");
-      })
-      .catch((error) => {
-        if (
-          error.code !== "auth/cancelled-popup-request" &&
-          error.code !== "auth/popup-closed-by-user"
-        ) {
-          setError(error.message);
-        }
-      })
-      .finally(() => {
-        setGoogleLoading(false);
-      });
   };
 
-  async function handleSubmit(e) {
+  const loginWithGoogle = async () => {
+    setGoogleLoading(true);
+    setError("");
+    try {
+      const auth = getAuth();
+      const provider = new GoogleAuthProvider();
+      const result = await signInWithPopup(auth, provider);
+
+      const token = await result.user.getIdToken();
+      localStorage.setItem("token", token);
+
+      setVerifyingAdmin(true);
+      const response = await axios.get("/api/users/me", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      // Redirect based on role
+      if (response.data.role === "admin") {
+        navigate("/admin");
+      } else {
+        navigate(from);
+      }
+    } catch (error) {
+      if (
+        !["auth/cancelled-popup-request", "auth/popup-closed-by-user"].includes(
+          error.code
+        )
+      ) {
+        const errorMessage = error.code
+          ? error.code.replace("auth/", "").replace(/-/g, " ")
+          : "Failed to sign in with Google";
+        setError(errorMessage);
+      }
+    } finally {
+      setGoogleLoading(false);
+      setVerifyingAdmin(false);
+    }
+  };
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setIsLoading(true);
     setError("");
     try {
-      await signInWithEmailAndPassword(auth, formData.email, formData.password);
-      navigate("/");
+      const userCredential = await signInWithEmailAndPassword(
+        auth,
+        formData.email,
+        formData.password
+      );
+
+      const token = await userCredential.user.getIdToken();
+      localStorage.setItem("token", token);
+
+      setVerifyingAdmin(true);
+      const response = await axios.get("/api/users/me", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      // Redirect based on role
+      if (response.data.role === "admin") {
+        navigate("/admin");
+      } else {
+        navigate(from);
+      }
     } catch (error) {
-      setError(error.message);
+      let errorMessage = "Sign in failed";
+      if (error.code) {
+        errorMessage = error.code.replace("auth/", "").replace(/-/g, " ");
+      } else if (error.response?.data?.error) {
+        errorMessage = error.response.data.error;
+      }
+      setError(errorMessage);
     } finally {
       setIsLoading(false);
+      setVerifyingAdmin(false);
     }
-  }
+  };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full bg-white rounded-2xl shadow-xl overflow-hidden p-8 space-y-8">
+        {/* Loading indicator */}
+        {(isLoading || verifyingAdmin) && (
+          <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
+            <div className="bg-white p-6 rounded-lg shadow-lg">
+              <p className="text-lg font-medium">
+                {verifyingAdmin ? "Verifying permissions..." : "Signing in..."}
+              </p>
+              <div className="mt-4 flex justify-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Logo Header */}
         <div className="text-center">
           <h1 className="text-4xl font-bold text-gray-900">
@@ -74,7 +149,7 @@ const SignIn = () => {
         {/* Error Message */}
         {error && (
           <div className="bg-red-50 text-red-600 p-3 rounded-lg text-sm">
-            {error}
+            {error.charAt(0).toUpperCase() + error.slice(1)}
           </div>
         )}
 
@@ -146,7 +221,7 @@ const SignIn = () => {
             <button
               type="submit"
               disabled={isLoading}
-              className="group relative w-full flex justify-center items-center py-3 px-4 border border-transparent text-sm font-medium rounded-lg text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-300"
+              className="group relative w-full flex justify-center items-center py-3 px-4 border border-transparent text-sm font-medium rounded-lg text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-300 disabled:opacity-75"
             >
               {isLoading ? (
                 "Signing in..."
@@ -177,7 +252,7 @@ const SignIn = () => {
           <button
             onClick={loginWithGoogle}
             disabled={googleLoading}
-            className="w-full flex items-center justify-center gap-2 py-3 px-4 border border-gray-300 rounded-lg bg-white text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-300"
+            className="w-full flex items-center justify-center gap-2 py-3 px-4 border border-gray-300 rounded-lg bg-white text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-300 disabled:opacity-75"
           >
             {googleLoading ? (
               "Signing in..."
