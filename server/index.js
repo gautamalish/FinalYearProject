@@ -5,7 +5,10 @@ const cors = require("cors");
 const admin = require("firebase-admin");
 const connectDB = require("./conn/db");
 const User = require("./models/UserModel");
-const Job = require("./models/JobModel");
+const { storage, cloudinary } = require("./utils/cloudinary");
+const Category = require("./models/CategoryModel");
+const multer = require("multer");
+const upload = multer({ storage });
 const app = express();
 
 // Middleware
@@ -135,47 +138,126 @@ app.get("/api/users/me/info", async (req, res) => {
 });
 // ADMIN-ONLY ROUTES
 
-// Jobs CRUD Operations
-app.post("/api/admin/jobs", verifyAdmin, async (req, res) => {
+// Job Categories CRUD Operations
+app.get("/api/admin/categories", verifyAdmin, async (req, res) => {
   try {
-    const job = new Job({
-      ...req.body,
-      createdBy: req.user._id,
+    const categories = await Category.find();
+    res.json(categories);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// Update your POST route in server.js
+app.post(
+  "/api/admin/categories",
+  verifyAdmin,
+  upload.single("thumbnail"),
+  async (req, res) => {
+    try {
+      const { name, description } = req.body;
+
+      // Make thumbnail optional
+      const thumbnail = req.file
+        ? {
+            url: req.file.path,
+            publicId: req.file.filename,
+          }
+        : {
+            url: "https://via.placeholder.com/150",
+            publicId: "",
+          };
+
+      const category = new Category({
+        name, // Changed from title to name to match frontend
+        description,
+        thumbnail,
+        createdBy: req.user._id,
+      });
+
+      const newCategory = await category.save();
+      res.status(201).json(newCategory);
+    } catch (err) {
+      console.error("Error uploading category:", err);
+      res.status(400).json({
+        message: err.message,
+        error: err, //full error in development
+      });
+    }
+  }
+);
+
+app.put(
+  "/api/admin/categories/:id",
+  verifyAdmin,
+  upload.single("thumbnail"),
+  async (req, res) => {
+    try {
+      const { name, description } = req.body;
+      const updateData = { name, description };
+
+      // Handle thumbnail update if file was uploaded
+      if (req.file) {
+        updateData.thumbnail = {
+          url: req.file.path,
+          publicId: req.file.filename,
+        };
+
+        // Optional: Delete old thumbnail from Cloudinary
+        const oldCategory = await Category.findById(req.params.id);
+        if (oldCategory?.thumbnail?.publicId) {
+          await cloudinary.uploader.destroy(oldCategory.thumbnail.publicId);
+        }
+      }
+
+      const updatedCategory = await Category.findByIdAndUpdate(
+        req.params.id,
+        updateData,
+        { new: true }
+      );
+
+      if (!updatedCategory) {
+        return res.status(404).json({ error: "Category not found" });
+      }
+
+      res.json(updatedCategory);
+    } catch (err) {
+      console.error("Error updating category:", err);
+      res.status(400).json({
+        error: "Failed to update category",
+        details:
+          process.env.NODE_ENV === "development" ? err.message : undefined,
+      });
+    }
+  }
+);
+
+app.delete("/api/admin/categories/:id", verifyAdmin, async (req, res) => {
+  try {
+    const category = await Category.findById(req.params.id);
+
+    if (!category) {
+      return res.status(404).json({ error: "Category not found" });
+    }
+
+    // Delete thumbnail from Cloudinary if exists
+    if (category.thumbnail?.publicId) {
+      await cloudinary.uploader.destroy(category.thumbnail.publicId);
+    }
+
+    await Category.findByIdAndDelete(req.params.id);
+
+    res.json({
+      success: true,
+      message: "Category deleted successfully",
+      deletedCategory: category,
     });
-
-    await job.save();
-    res.status(201).json(job);
-  } catch (error) {
-    res.status(400).json({ error: error.message });
-  }
-});
-
-app.get("/api/admin/jobs", verifyAdmin, async (req, res) => {
-  try {
-    const jobs = await Job.find().populate("createdBy", "name email");
-    res.json(jobs);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-app.put("/api/admin/jobs/:id", verifyAdmin, async (req, res) => {
-  try {
-    const job = await Job.findByIdAndUpdate(req.params.id, req.body, {
-      new: true,
+  } catch (err) {
+    console.error("Error deleting category:", err);
+    res.status(500).json({
+      error: "Failed to delete category",
+      details: process.env.NODE_ENV === "development" ? err.message : undefined,
     });
-    res.json(job);
-  } catch (error) {
-    res.status(400).json({ error: error.message });
-  }
-});
-
-app.delete("/api/admin/jobs/:id", verifyAdmin, async (req, res) => {
-  try {
-    await Job.findByIdAndDelete(req.params.id);
-    res.json({ message: "Job deleted successfully" });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
   }
 });
 
@@ -212,17 +294,15 @@ app.delete("/api/admin/users/:id", verifyAdmin, async (req, res) => {
 app.get("/api/admin/stats", verifyAdmin, async (req, res) => {
   try {
     const userCount = await User.countDocuments();
-    const workerCount = await User.countDocuments({ role: "worker" });
-    const jobCount = await Job.countDocuments();
-    const activeJobCount = await Job.countDocuments({ status: "active" });
+    const categoryCount = await Category.countDocuments();
+    // Add more counts as needed
 
     res.json({
-      userCount,
-      workerCount,
-      jobCount,
-      activeJobCount,
+      totalUsers: userCount,
+      totalCategories: categoryCount,
     });
   } catch (error) {
+    console.error("Error fetching stats:", error);
     res.status(500).json({ error: error.message });
   }
 });
