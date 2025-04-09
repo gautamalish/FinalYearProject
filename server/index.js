@@ -12,7 +12,18 @@ const upload = multer({ storage });
 const app = express();
 
 // Middleware
-app.use(cors());
+const corsOptions = {
+  origin: "http://localhost:5173", // Explicitly set your frontend origin
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+  credentials: true,
+  optionsSuccessStatus: 200,
+};
+
+app.use(cors(corsOptions));
+
+// Handle preflight requests
+app.options("*", cors(corsOptions));
 app.use(express.json());
 
 // Initialize Firebase Admin
@@ -25,33 +36,51 @@ admin.initializeApp({
 connectDB();
 // Admin Middleware (verify admin status)
 const verifyAdmin = async (req, res, next) => {
-  try {
-    console.log("Authorization header:", req.headers.authorization); // Debug 1
+  // Skip for OPTIONS requests
+  if (req.method === "OPTIONS") return next();
 
-    const token = req.headers.authorization?.split(" ")[1];
-    if (!token) {
-      console.log("No token provided"); // Debug 2
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader?.startsWith("Bearer ")) {
+      console.log("Missing or malformed auth header");
       return res.status(401).json({ error: "Authorization token required" });
     }
 
+    const token = authHeader.split(" ")[1].trim();
+    console.log("Received token:", token); // Debug log
+
+    // Verify token with Firebase
     const decodedToken = await admin.auth().verifyIdToken(token);
-    console.log("Decoded UID:", decodedToken.uid); // Debug 3
+    console.log("Decoded token UID:", decodedToken.uid);
 
-    const user = await User.findOne({ firebaseUID: decodedToken.uid });
-    console.log("Found user:", user); // Debug 4
+    // Check if user exists and is admin
+    const user = await User.findOne({
+      firebaseUID: decodedToken.uid,
+      role: "admin",
+    }).lean();
 
-    if (!user || user.role !== "admin") {
-      console.log("User not admin:", user?.role); // Debug 5
+    if (!user) {
+      console.log("User not found or not admin");
       return res.status(403).json({ error: "Admin access required" });
     }
 
     req.user = user;
     next();
   } catch (error) {
-    console.error("Admin verification error:", error); // Debug 6
-    res.status(500).json({ error: error.message });
+    console.error("Authentication error:", error);
+
+    if (error.code === "auth/id-token-expired") {
+      return res.status(401).json({ error: "Token expired - please refresh" });
+    }
+
+    res.status(401).json({
+      error: "Authentication failed",
+      details:
+        process.env.NODE_ENV === "development" ? error.message : undefined,
+    });
   }
 };
+
 // Routes
 app.post("/api/users", async (req, res) => {
   try {
@@ -112,28 +141,21 @@ app.get("/api/users/me", verifyAdmin, async (req, res) => {
   }
 });
 // Add this before your admin routes
-app.get("/api/users/me/info", async (req, res) => {
+app.get("/api/users/me/info", cors(corsOptions), async (req, res) => {
   try {
     const token = req.headers.authorization?.split(" ")[1];
-    if (!token) {
-      return res.status(401).json({ error: "Authorization token required" });
-    }
+    if (!token) return res.status(401).json({ error: "Token required" });
 
     const decodedToken = await admin.auth().verifyIdToken(token);
     const user = await User.findOne({ firebaseUID: decodedToken.uid });
-
-    if (!user) {
-      return res.status(404).json({ error: "User not found" });
-    }
 
     res.json({
       _id: user._id,
       email: user.email,
       role: user.role,
-      // other non-sensitive fields
     });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(401).json({ error: "Invalid token" });
   }
 });
 // ADMIN-ONLY ROUTES
@@ -155,9 +177,9 @@ app.post(
   upload.single("thumbnail"),
   async (req, res) => {
     try {
+      // Important: Use req.body for text fields, req.file for the image
       const { name, description } = req.body;
 
-      // Make thumbnail optional
       const thumbnail = req.file
         ? {
             url: req.file.path,
@@ -169,19 +191,25 @@ app.post(
           };
 
       const category = new Category({
-        name, // Changed from title to name to match frontend
+        name,
         description,
         thumbnail,
         createdBy: req.user._id,
       });
 
       const newCategory = await category.save();
-      res.status(201).json(newCategory);
+
+      // Ensure consistent response format
+      res.status(201).json({
+        ...newCategory.toObject(),
+        thumbnail: thumbnail.url, // Always return the URL string
+      });
     } catch (err) {
-      console.error("Error uploading category:", err);
+      console.error("Create category error:", err);
       res.status(400).json({
-        message: err.message,
-        error: err, //full error in development
+        error: "Failed to create category",
+        details:
+          process.env.NODE_ENV === "development" ? err.message : undefined,
       });
     }
   }
@@ -193,21 +221,25 @@ app.put(
   upload.single("thumbnail"),
   async (req, res) => {
     try {
-      const { name, description } = req.body;
-      const updateData = { name, description };
+      const updateData = {
+        name: req.body.name,
+        description: req.body.description,
+      };
 
-      // Handle thumbnail update if file was uploaded
+      // Only process thumbnail if file was uploaded
       if (req.file) {
+        // Delete old thumbnail if exists
+        const oldCategory = await Category.findById(req.params.id);
+        if (oldCategory?.thumbnail?.publicId) {
+          await cloudinary.uploader
+            .destroy(oldCategory.thumbnail.publicId)
+            .catch((err) => console.error("Error deleting old image:", err));
+        }
+
         updateData.thumbnail = {
           url: req.file.path,
           publicId: req.file.filename,
         };
-
-        // Optional: Delete old thumbnail from Cloudinary
-        const oldCategory = await Category.findById(req.params.id);
-        if (oldCategory?.thumbnail?.publicId) {
-          await cloudinary.uploader.destroy(oldCategory.thumbnail.publicId);
-        }
       }
 
       const updatedCategory = await Category.findByIdAndUpdate(
@@ -220,9 +252,13 @@ app.put(
         return res.status(404).json({ error: "Category not found" });
       }
 
-      res.json(updatedCategory);
+      // Ensure consistent response format
+      res.json({
+        ...updatedCategory.toObject(),
+        thumbnail: updateData.thumbnail || updatedCategory.thumbnail,
+      });
     } catch (err) {
-      console.error("Error updating category:", err);
+      console.error("Update error:", err);
       res.status(400).json({
         error: "Failed to update category",
         details:
@@ -289,17 +325,99 @@ app.delete("/api/admin/users/:id", verifyAdmin, async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
+app.post("/api/categories/:id/view", async (req, res) => {
+  try {
+    const category = await Category.findById(req.params.id);
+    if (!category) {
+      return res.status(404).json({ error: "Category not found" });
+    }
 
+    await category.incrementViewCount();
+    res.json({ success: true, viewCount: category.viewCount });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get popular categories (most viewed)
+app.get("/api/popular-categories", async (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit) || 4;
+    const timePeriod = req.query.period || "all"; // 'all', 'week', 'month'
+
+    let dateFilter = {};
+    if (timePeriod === "week") {
+      dateFilter = {
+        lastViewed: { $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) },
+      };
+    } else if (timePeriod === "month") {
+      dateFilter = {
+        lastViewed: { $gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) },
+      };
+    }
+
+    const popularCategories = await Category.find(dateFilter)
+      .sort({ viewCount: -1 })
+      .limit(limit);
+
+    res.json(popularCategories);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Analytics Endpoints
 // Analytics Endpoints
 app.get("/api/admin/stats", verifyAdmin, async (req, res) => {
   try {
-    const userCount = await User.countDocuments();
-    const categoryCount = await Category.countDocuments();
-    // Add more counts as needed
+    // Basic counts
+    const totalUsers = await User.countDocuments();
+    const totalCategories = await Category.countDocuments();
+    const totalWorkers = await User.countDocuments({ role: "worker" });
+
+    // Growth calculations (you'll need to implement these properly)
+    const oneMonthAgo = new Date();
+    oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
+
+    const newUsersThisMonth = await User.countDocuments({
+      createdAt: { $gte: oneMonthAgo },
+    });
+    const userGrowthPercentage =
+      Math.round(
+        (newUsersThisMonth / (totalUsers - newUsersThisMonth)) * 100
+      ) || 0;
+
+    const newCategoriesThisMonth = await Category.countDocuments({
+      createdAt: { $gte: oneMonthAgo },
+    });
+
+    const newWorkersThisMonth = await User.countDocuments({
+      role: "worker",
+      createdAt: { $gte: oneMonthAgo },
+    });
+
+    // Recent activities (simplified example)
+    const recentActivities = await User.find()
+      .sort({ createdAt: -1 })
+      .limit(5)
+      .select("name email role createdAt")
+      .lean()
+      .then((users) =>
+        users.map((user) => ({
+          type: "user",
+          message: `New ${user.role} registered: ${user.name}`,
+          timestamp: user.createdAt,
+        }))
+      );
 
     res.json({
-      totalUsers: userCount,
-      totalCategories: categoryCount,
+      totalUsers,
+      totalCategories,
+      totalWorkers,
+      userGrowthPercentage,
+      newCategoriesThisMonth,
+      newWorkersThisMonth,
+      recentActivities,
     });
   } catch (error) {
     console.error("Error fetching stats:", error);

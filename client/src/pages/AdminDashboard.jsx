@@ -50,21 +50,43 @@ const AdminDashboard = () => {
           return;
         }
 
-        const token = await currentUser.getIdToken();
+        // Force token refresh and get fresh token
+        const token = await currentUser.getIdToken(true);
+        console.log("Current token:", token); // Debug log
 
-        // Load all data in parallel
+        const headers = {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        };
+
         const [usersData, categoriesData, statsData] = await Promise.all([
-          fetchUsers(token),
-          fetchCategories(token),
-          fetchStats(token),
+          fetchUsers(token).catch((e) => {
+            throw new Error(`Users: ${e.message}`);
+          }),
+          fetchCategories(token).catch((e) => {
+            throw new Error(`Categories: ${e.message}`);
+          }),
+          fetchStats(token)
+            .then((data) => {
+              console.log("Stats data received:", data); // Add this line
+              return data;
+            })
+            .catch((e) => {
+              throw new Error(`Stats: ${e.message}`);
+            }),
         ]);
 
         setUsers(usersData);
         setCategories(categoriesData);
         setStats(statsData);
       } catch (err) {
-        console.error("Error loading dashboard data:", err);
-        setError("Failed to load dashboard data. Please try again.");
+        console.error("Data loading error:", err);
+        if (err.message.includes("401")) {
+          // Token expired - force logout
+          logOut();
+          navigate("/signin");
+        }
+        setError("Failed to load data. Please refresh the page.");
       } finally {
         setLoading(false);
       }
@@ -81,17 +103,31 @@ const AdminDashboard = () => {
       }
 
       setLoading(true);
-      const token = await currentUser.getIdToken();
+      const token = await currentUser.getIdToken(true); // Force fresh token
 
-      const categoryData = {
-        name: newCategory.name,
-        description: newCategory.description,
-        thumbnail: newCategory.thumbnail, // This should be the File object
-      };
+      // Create FormData object
+      const formData = new FormData();
+      formData.append("name", newCategory.name);
+      formData.append("description", newCategory.description);
 
-      const createdCategory = await createCategory(categoryData, token);
-      setCategories([...categories, createdCategory]);
+      // Only append if it's a File object
+      if (newCategory.thumbnail instanceof File) {
+        formData.append("thumbnail", newCategory.thumbnail);
+      }
 
+      const createdCategory = await createCategory(formData, token);
+
+      // Update state with the new category
+      setCategories([
+        ...categories,
+        {
+          ...createdCategory,
+          thumbnail:
+            createdCategory.thumbnail?.url || createdCategory.thumbnail,
+        },
+      ]);
+
+      // Reset form
       setNewCategory({
         name: "",
         description: "",
@@ -100,7 +136,7 @@ const AdminDashboard = () => {
       });
     } catch (error) {
       console.error("Error adding category:", error);
-      setError(error.message || "Failed to add category. Please try again.");
+      setError(error.response?.data?.message || "Failed to add category");
     } finally {
       setLoading(false);
     }
@@ -116,34 +152,40 @@ const AdminDashboard = () => {
       setLoading(true);
       const token = await currentUser.getIdToken();
 
-      let thumbnailUrl = editingCategory.thumbnail;
-      if (editingCategory.newThumbnail) {
-        thumbnailUrl = await uploadImageToCloudinary(
-          editingCategory.newThumbnail
-        );
+      // Create FormData object
+      const formData = new FormData();
+      formData.append("name", editingCategory.name);
+      formData.append("description", editingCategory.description);
+
+      // Only append thumbnail if it's a new file
+      if (editingCategory.newThumbnail instanceof File) {
+        formData.append("thumbnail", editingCategory.newThumbnail);
       }
 
-      const categoryData = {
-        name: editingCategory.name,
-        description: editingCategory.description,
-        thumbnail: thumbnailUrl,
-      };
-
+      // Send the FormData directly to backend
       const updatedCategory = await updateCategory(
         editingCategory._id,
-        categoryData,
+        formData, // Send FormData instead of regular object
         token
       );
 
+      // Update state with the response
       setCategories(
         categories.map((cat) =>
-          cat._id === updatedCategory._id ? updatedCategory : cat
+          cat._id === updatedCategory._id
+            ? {
+                ...updatedCategory,
+                thumbnail:
+                  updatedCategory.thumbnail?.url || updatedCategory.thumbnail,
+              }
+            : cat
         )
       );
+
       setEditingCategory(null);
     } catch (error) {
       console.error("Error updating category:", error);
-      setError("Failed to update category. Please try again.");
+      setError(error.message || "Failed to update category. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -483,12 +525,14 @@ const AdminDashboard = () => {
                         src={
                           category.thumbnail?.url ||
                           category.thumbnail ||
-                          "https://via.placeholder.com/150"
+                          "/fallback.png"
                         }
-                        alt={category.name}
+                        alt="category thumbnail"
                         className="w-full h-full object-cover"
                         onError={(e) => {
-                          e.target.src = "https://via.placeholder.com/150";
+                          if (!e.target.src.includes("fallback.png")) {
+                            e.target.src = "/fallback.png";
+                          }
                         }}
                       />
                     </div>
