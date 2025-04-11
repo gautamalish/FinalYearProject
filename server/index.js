@@ -34,6 +34,30 @@ admin.initializeApp({
 
 // Connect to MongoDB
 connectDB();
+const verifyUser = async (req, res, next) => {
+  if (req.method === "OPTIONS") return next();
+
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader?.startsWith("Bearer ")) {
+      return res.status(401).json({ error: "Authorization token required" });
+    }
+
+    const token = authHeader.split(" ")[1].trim();
+    const decodedToken = await admin.auth().verifyIdToken(token);
+    const user = await User.findOne({ firebaseUID: decodedToken.uid }).lean();
+
+    if (!user) {
+      return res.status(403).json({ error: "User access required" });
+    }
+
+    req.user = user;
+    next();
+  } catch (error) {
+    console.error("Authentication error:", error);
+    res.status(401).json({ error: "Authentication failed" });
+  }
+};
 // Admin Middleware (verify admin status)
 const verifyAdmin = async (req, res, next) => {
   // Skip for OPTIONS requests
@@ -111,6 +135,10 @@ app.post("/api/users", async (req, res) => {
       email: req.body.email,
       role: req.body.role || "client",
     });
+    if (req.body.role === "worker") {
+      newUser.categories = req.body.categories || [];
+      newUser.profilePicture = req.body.profilePicture || "";
+    }
 
     await newUser.save();
     console.log("User saved to MongoDB:", newUser);
@@ -161,12 +189,13 @@ app.get("/api/users/me/info", cors(corsOptions), async (req, res) => {
 // ADMIN-ONLY ROUTES
 
 // Job Categories CRUD Operations
-app.get("/api/admin/categories", verifyAdmin, async (req, res) => {
+app.get("/api/categories", async (req, res) => {
   try {
-    const categories = await Category.find();
+    const categories = await Category.find().select("-createdBy -__v");
     res.json(categories);
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    console.error("Error fetching categories:", err);
+    res.status(500).json({ error: "Failed to fetch categories" });
   }
 });
 
@@ -214,6 +243,23 @@ app.post(
     }
   }
 );
+// Get workers by category
+app.get("/api/workers/:categoryId", async (req, res) => {
+  try {
+    const workers = await User.find({
+      role: "worker",
+      categories: req.params.categoryId,
+    })
+      .select("name email phone profilePicture rating")
+      .lean();
+
+    // Ensure we always return an array
+    res.json(Array.isArray(workers) ? workers : []);
+  } catch (error) {
+    console.error("Error fetching workers:", error);
+    res.status(500).json([]); // Return empty array on error
+  }
+});
 
 app.put(
   "/api/admin/categories/:id",
@@ -325,7 +371,7 @@ app.delete("/api/admin/users/:id", verifyAdmin, async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
-app.post("/api/categories/:id/view", async (req, res) => {
+app.post("/api/categories/:id/view", verifyUser, async (req, res) => {
   try {
     const category = await Category.findById(req.params.id);
     if (!category) {
@@ -343,7 +389,7 @@ app.post("/api/categories/:id/view", async (req, res) => {
 app.get("/api/popular-categories", async (req, res) => {
   try {
     const limit = parseInt(req.query.limit) || 4;
-    const timePeriod = req.query.period || "all"; // 'all', 'week', 'month'
+    const timePeriod = req.query.period || "all";
 
     let dateFilter = {};
     if (timePeriod === "week") {
@@ -358,11 +404,13 @@ app.get("/api/popular-categories", async (req, res) => {
 
     const popularCategories = await Category.find(dateFilter)
       .sort({ viewCount: -1 })
-      .limit(limit);
+      .limit(limit)
+      .select("-createdBy -__v");
 
     res.json(popularCategories);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error("Error fetching popular categories:", error);
+    res.status(500).json({ error: "Failed to fetch popular categories" });
   }
 });
 
@@ -396,6 +444,269 @@ app.get("/api/admin/stats", verifyAdmin, async (req, res) => {
       createdAt: { $gte: oneMonthAgo },
     });
 
+    // Get user by Firebase UID
+    app.get("/api/users/:firebaseUID", verifyUser, async (req, res) => {
+      try {
+        const user = await User.findOne({
+          firebaseUID: req.params.firebaseUID,
+        });
+        if (!user) {
+          return res.status(404).json({ error: "User not found" });
+        }
+        res.json(user);
+      } catch (error) {
+        res.status(500).json({ error: error.message });
+      }
+    });
+
+    // Update user categories
+    app.patch(
+      "/api/users/:firebaseUID/categories",
+      verifyUser,
+      async (req, res) => {
+        try {
+          const updatedUser = await User.findOneAndUpdate(
+            { firebaseUID: req.params.firebaseUID },
+            { $set: { categories: req.body.categories } },
+            { new: true }
+          );
+          res.json(updatedUser);
+        } catch (error) {
+          res.status(500).json({ error: error.message });
+        }
+      }
+    );
+    // User Profile Image Routes
+    app.patch(
+      "/api/admin/users/:userId/profile-image",
+      verifyAdmin,
+      async (req, res) => {
+        try {
+          const { profileImage } = req.body;
+
+          const updatedUser = await User.findByIdAndUpdate(
+            req.params.userId,
+            { profileImage },
+            { new: true }
+          );
+
+          res.json(updatedUser);
+        } catch (error) {
+          res.status(500).json({ error: error.message });
+        }
+      }
+    );
+    // Update worker availability
+    app.patch(
+      "/api/workers/:firebaseUID/availability",
+      verifyUser,
+      async (req, res) => {
+        try {
+          const updatedWorker = await Worker.findOneAndUpdate(
+            { firebaseUID: req.params.firebaseUID },
+            { $set: { availability: req.body } },
+            { new: true }
+          );
+
+          res.json(updatedWorker);
+        } catch (error) {
+          res.status(500).json({ error: error.message });
+        }
+      }
+    );
+    // Get worker statistics
+    app.get("/api/workers/:workerId/stats", verifyUser, async (req, res) => {
+      try {
+        const { range } = req.query;
+        const workerId = req.params.workerId;
+
+        // Calculate date ranges based on the selected time range
+        let startDate;
+        const endDate = new Date();
+
+        switch (range) {
+          case "7days":
+            startDate = new Date();
+            startDate.setDate(endDate.getDate() - 7);
+            break;
+          case "30days":
+            startDate = new Date();
+            startDate.setDate(endDate.getDate() - 30);
+            break;
+          case "90days":
+            startDate = new Date();
+            startDate.setDate(endDate.getDate() - 90);
+            break;
+          case "12months":
+            startDate = new Date();
+            startDate.setFullYear(endDate.getFullYear() - 1);
+            break;
+          default: // 'all'
+            startDate = new Date(0); // Unix epoch
+        }
+
+        // Get worker data
+        const worker = await Worker.findById(workerId).lean();
+
+        // Get job statistics
+        const jobsCompleted = await Job.countDocuments({
+          worker: workerId,
+          status: "completed",
+          completedAt: { $gte: startDate, $lte: endDate },
+        });
+
+        const jobsInProgress = await Job.countDocuments({
+          worker: workerId,
+          status: { $in: ["in_progress", "accepted"] },
+        });
+
+        // Get rating statistics
+        const ratingAggregation = await Review.aggregate([
+          { $match: { worker: mongoose.Types.ObjectId(workerId) } },
+          {
+            $group: {
+              _id: null,
+              averageRating: { $avg: "$rating" },
+              totalRatings: { $sum: 1 },
+              ratingDistribution: {
+                $push: {
+                  k: { $toString: "$rating" },
+                  v: 1,
+                },
+              },
+            },
+          },
+          {
+            $project: {
+              averageRating: 1,
+              totalRatings: 1,
+              ratingDistribution: { $arrayToObject: "$ratingDistribution" },
+            },
+          },
+        ]);
+
+        // Get earnings statistics
+        const earningsAggregation = await Job.aggregate([
+          {
+            $match: {
+              worker: mongoose.Types.ObjectId(workerId),
+              status: "completed",
+              completedAt: { $gte: startDate, $lte: endDate },
+            },
+          },
+          {
+            $group: {
+              _id: null,
+              totalEarnings: { $sum: "$price" },
+              totalFees: { $sum: "$serviceFee" },
+              avgEarningsPerJob: { $avg: "$price" },
+            },
+          },
+        ]);
+
+        // Get pending earnings
+        const pendingEarningsAggregation = await Job.aggregate([
+          {
+            $match: {
+              worker: mongoose.Types.ObjectId(workerId),
+              status: "completed",
+              paymentStatus: "pending",
+            },
+          },
+          {
+            $group: {
+              _id: null,
+              amount: { $sum: "$price" },
+            },
+          },
+        ]);
+
+        // Get job trends
+        const jobTrends = await Job.aggregate([
+          {
+            $match: {
+              worker: mongoose.Types.ObjectId(workerId),
+              status: "completed",
+              completedAt: { $gte: startDate, $lte: endDate },
+            },
+          },
+          {
+            $group: {
+              _id: {
+                $dateToString: { format: "%Y-%m-%d", date: "$completedAt" },
+              },
+              count: { $sum: 1 },
+            },
+          },
+          { $sort: { _id: 1 } },
+        ]);
+
+        // Get earnings trends by month
+        const earningsTrend = await Job.aggregate([
+          {
+            $match: {
+              worker: mongoose.Types.ObjectId(workerId),
+              status: "completed",
+              completedAt: { $gte: startDate, $lte: endDate },
+            },
+          },
+          {
+            $group: {
+              _id: {
+                $dateToString: { format: "%Y-%m", date: "$completedAt" },
+              },
+              amount: { $sum: "$price" },
+            },
+          },
+          { $sort: { _id: 1 } },
+        ]);
+
+        // Get recent reviews
+        const recentReviews = await Review.find({ worker: workerId })
+          .sort({ createdAt: -1 })
+          .limit(3)
+          .populate("client", "name")
+          .lean();
+
+        // Prepare response
+        const stats = {
+          jobsCompleted,
+          jobsInProgress,
+          averageRating: ratingAggregation[0]?.averageRating || 0,
+          totalRatings: ratingAggregation[0]?.totalRatings || 0,
+          ratingDistribution: ratingAggregation[0]?.ratingDistribution || {
+            1: 0,
+            2: 0,
+            3: 0,
+            4: 0,
+            5: 0,
+          },
+          totalEarnings: earningsAggregation[0]?.totalEarnings || 0,
+          totalFees: earningsAggregation[0]?.totalFees || 0,
+          avgEarningsPerJob: earningsAggregation[0]?.avgEarningsPerJob || 0,
+          pendingEarnings: pendingEarningsAggregation[0]?.amount || 0,
+          netEarnings:
+            (earningsAggregation[0]?.totalEarnings || 0) -
+            (earningsAggregation[0]?.totalFees || 0),
+          jobTrends: jobTrends.map((t) => ({ date: t._id, count: t.count })),
+          earningsTrend: earningsTrend.map((t) => ({
+            month: t._id,
+            amount: t.amount,
+          })),
+          recentReviews: recentReviews.map((r) => ({
+            rating: r.rating,
+            comment: r.comment,
+            date: r.createdAt,
+            clientName: r.client?.name || "Anonymous",
+          })),
+          // Add more stats as needed...
+        };
+
+        res.json(stats);
+      } catch (error) {
+        res.status(500).json({ error: error.message });
+      }
+    });
     // Recent activities (simplified example)
     const recentActivities = await User.find()
       .sort({ createdAt: -1 })

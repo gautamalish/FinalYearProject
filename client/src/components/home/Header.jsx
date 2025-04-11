@@ -7,7 +7,10 @@ const Header = () => {
   const navigate = useNavigate();
   const { currentUser, logOut } = useAuth();
   console.log(currentUser);
-
+  const handleLogout = async () => {
+    await logOut();
+    navigate("/signin");
+  };
   return (
     <header className="bg-gradient-to-r from-blue-600 to-indigo-700 shadow-lg sticky top-0 w-full z-50">
       <nav className="max-w-[100rem] mx-auto flex justify-between items-center p-4 sm:p-5 lg:p-6">
@@ -80,7 +83,7 @@ const Header = () => {
               </button>
               <button
                 className="px-4 py-2 rounded-lg bg-red-500 text-white font-semibold hover:bg-red-600 transition-all"
-                onClick={logOut}
+                onClick={handleLogout}
               >
                 Log Out
               </button>

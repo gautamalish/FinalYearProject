@@ -21,6 +21,8 @@ const CategorySchema = new mongoose.Schema({
       required: false,
     },
   },
+  viewCount: { type: Number, default: 0 },
+  lastViewed: Date,
   createdBy: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "User",
@@ -31,5 +33,12 @@ const CategorySchema = new mongoose.Schema({
     default: Date.now,
   },
 });
+CategorySchema.methods.incrementViewCount = async function () {
+  this.viewCount += 1;
+  this.weeklyViewCount += 1;
+  this.monthlyViewCount += 1;
+  this.lastViewed = new Date();
+  await this.save();
+};
 
 module.exports = mongoose.model("Category", CategorySchema);

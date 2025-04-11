@@ -11,6 +11,17 @@ const userSchema = new mongoose.Schema({
     enum: ["client", "worker", "admin"],
     default: "client",
   },
+  categories: [
+    {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Category",
+    },
+  ],
+  rating: {
+    type: Number,
+    default: 0,
+  },
+  profilePicture: String,
   createdAt: { type: Date, default: Date.now },
 });
 

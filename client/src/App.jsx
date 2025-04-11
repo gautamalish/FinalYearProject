@@ -8,6 +8,7 @@ import WorkerList from "./pages/WorkerList";
 import HiringPage from "./pages/HiringPage";
 import AdminDashboard from "./pages/AdminDashboard";
 import ProtectedAdminRoute from "./components/ProtectedAdmin";
+import WorkerProfilePage from "./pages/WorkerProfilePage";
 
 function App() {
   return (
@@ -18,8 +19,9 @@ function App() {
           <Route path="/signin" element={<SignIn />} />
           <Route path="/signup" element={<SignUp />} />
           <Route path="/location" element={<MapComponent />} />
-          <Route path="/workers" element={<WorkerList />} />
+          <Route path="/services/:categoryName" element={<WorkerList />} />
           <Route path="/hiring" element={<HiringPage />} />
+          <Route path="/worker/profile" element={<WorkerProfilePage />} />
           <Route
             path="/admin"
             element={
