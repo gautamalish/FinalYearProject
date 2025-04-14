@@ -9,6 +9,8 @@ import {
   FaImage,
   FaSave,
   FaTimes,
+  FaSignOutAlt,
+  FaInfoCircle
 } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
@@ -25,7 +27,7 @@ import {
 } from "../services/admin";
 
 const AdminDashboard = () => {
-  const { currentUser, logOut } = useAuth();
+  const { currentUser, mongoUser, logOut } = useAuth();
   const [activeTab, setActiveTab] = useState("categories");
   const [users, setUsers] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -40,6 +42,15 @@ const AdminDashboard = () => {
     thumbnail: null,
     thumbnailPreview: "",
   });
+
+  // Add Tailwind CSS classes for consistent styling
+  const tabButtonClasses = "px-4 py-2 text-sm font-medium rounded-lg transition-colors duration-200";
+  const activeTabClasses = "bg-blue-600 text-white hover:bg-blue-700";
+  const inactiveTabClasses = "text-gray-600 hover:bg-gray-100";
+  const cardClasses = "bg-white rounded-lg shadow-md p-6 mb-6";
+  const inputClasses = "w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500";
+  const buttonClasses = "px-4 py-2 rounded-lg font-medium transition-colors duration-200";
+
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -50,9 +61,13 @@ const AdminDashboard = () => {
           return;
         }
 
-        // Force token refresh and get fresh token
+        // Get token from Firebase user object
         const token = await currentUser.getIdToken(true);
-        console.log("Current token:", token); // Debug log
+
+        if (!mongoUser?.role === "admin") {
+          navigate("/");
+          return;
+        }
 
         const headers = {
           Authorization: `Bearer ${token}`,
@@ -285,17 +300,19 @@ const AdminDashboard = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4 md:p-8">
+    <div className="min-h-screen bg-gray-50 p-4 sm:p-6 lg:p-8">
       <div className="max-w-7xl mx-auto">
-        <div className="flex justify-between items-center mb-6">
-          <h1 className="text-2xl md:text-3xl font-bold text-gray-800">
-            Admin Dashboard
-          </h1>
+        {/* Header */}
+        <div className="flex justify-between items-center mb-8 bg-white rounded-xl shadow-sm p-6">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">Admin Dashboard</h1>
+            <p className="text-gray-600 mt-1">Manage your platform's content and users</p>
+          </div>
           <button
-            onClick={logOut}
-            className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+            onClick={() => logOut()}
+            className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors duration-200 flex items-center gap-2 font-medium"
           >
-            Logout
+            <FaSignOutAlt /> Logout
           </button>
         </div>
 
@@ -312,52 +329,46 @@ const AdminDashboard = () => {
         )}
 
         {/* Navigation Tabs */}
-        <div className="flex flex-wrap gap-2 mb-6 border-b border-gray-200">
+        <div className="flex space-x-4 mb-8 bg-white rounded-xl shadow-sm p-2">
           <button
-            onClick={() => setActiveTab("categories")}
-            className={`px-4 py-2 rounded-t-lg font-medium flex items-center gap-2 ${
-              activeTab === "categories"
-                ? "bg-blue-600 text-white"
-                : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-            }`}
+            className={`${tabButtonClasses} ${activeTab === 'categories' ? activeTabClasses : inactiveTabClasses} flex items-center gap-2`}
+            onClick={() => setActiveTab('categories')}
           >
-            <FaBriefcase /> Categories
+            <FaBriefcase className="text-lg" /> Categories
           </button>
           <button
-            onClick={() => setActiveTab("users")}
-            className={`px-4 py-2 rounded-t-lg font-medium flex items-center gap-2 ${
-              activeTab === "users"
-                ? "bg-blue-600 text-white"
-                : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-            }`}
+            className={`${tabButtonClasses} ${activeTab === 'users' ? activeTabClasses : inactiveTabClasses} flex items-center gap-2`}
+            onClick={() => setActiveTab('users')}
           >
-            <FaUsers /> Users
+            <FaUsers className="text-lg" /> Users
           </button>
           <button
-            onClick={() => setActiveTab("analytics")}
-            className={`px-4 py-2 rounded-t-lg font-medium flex items-center gap-2 ${
-              activeTab === "analytics"
-                ? "bg-blue-600 text-white"
-                : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-            }`}
+            className={`${tabButtonClasses} ${activeTab === 'stats' ? activeTabClasses : inactiveTabClasses} flex items-center gap-2`}
+            onClick={() => setActiveTab('stats')}
           >
-            <FaChartLine /> Analytics
+            <FaChartLine className="text-lg" /> Statistics
           </button>
         </div>
 
         {/* Categories Management */}
         {activeTab === "categories" && (
-          <div className="bg-white rounded-xl shadow-md p-6">
-            <h2 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
-              <FaBriefcase /> Category Management
-            </h2>
+          <div className={cardClasses}>
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-2xl font-semibold text-gray-900 flex items-center gap-2">
+                <FaBriefcase /> Category Management
+              </h2>
+              <div className="flex items-center text-sm text-gray-600">
+                <FaInfoCircle className="mr-2" />
+                <span>Manage service categories</span>
+              </div>
+            </div>
 
             {/* Add New Category Form */}
-            <div className="mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
-              <h3 className="font-medium text-gray-700 mb-3 flex items-center gap-2">
+            <div className="mb-8 p-6 bg-gray-50 rounded-xl border border-gray-200">
+              <h3 className="text-lg font-medium text-gray-800 mb-4 flex items-center gap-2">
                 <FaPlus /> Add New Category
               </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Name
@@ -680,7 +691,7 @@ const AdminDashboard = () => {
         )}
 
         {/* Analytics Dashboard */}
-        {activeTab === "analytics" && stats && (
+        {activeTab === "stats" && stats && (
           <div className="bg-white rounded-xl shadow-md p-6">
             <h2 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
               <FaChartLine /> System Analytics

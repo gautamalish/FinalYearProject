@@ -5,13 +5,20 @@ import { fetchCategories } from "../../services/admin";
 import axios from "axios";
 import defaultImage from "../../assets/gardener.jpg";
 import { fetchPopularCategories } from "../../services/admin";
+import {
+  FaSearch,
+  FaUserTie,
+  FaStar,
+  FaArrowRight,
+  FaCheckCircle,
+} from "react-icons/fa";
 
 const ServiceCategoriesPage = () => {
   const [categories, setCategories] = useState([]);
   const [popularCategories, setPopularCategories] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
-  const { currentUser } = useAuth();
+  const { currentUser,fetchMongoUser } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -63,7 +70,7 @@ const ServiceCategoriesPage = () => {
 
     fetchServiceCategories();
   }, []);
-
+  console.log(currentUser);
   const handleCategorySelection = async (categoryId, categoryName) => {
     // Track view if user is logged in
     if (currentUser) {
@@ -111,27 +118,111 @@ const ServiceCategoriesPage = () => {
   return (
     <main className="max-w-[100rem] mx-auto mt-8 px-4 sm:px-6 lg:px-8 xl:px-12">
       {/* Hero Banner */}
-      <section className="mb-16 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-2xl p-8 md:p-12 text-white">
-        <h1 className="text-4xl md:text-5xl font-bold mb-4">
-          Find Trusted Home Service Professionals
-        </h1>
-        <p className="text-xl md:text-2xl opacity-90 max-w-2xl">
-          Browse categories to discover skilled professionals ready to help
-        </p>
+      <section className="mb-16 relative overflow-hidden rounded-2xl">
+        <div className="absolute inset-0 bg-gradient-to-r from-blue-600 to-indigo-700 opacity-90"></div>
+        <div className="relative z-10 p-8 md:p-12 lg:p-16 text-white">
+          <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-6 max-w-2xl">
+            Find Trusted Home Service Professionals
+          </h1>
+          <p className="text-xl md:text-2xl opacity-90 max-w-2xl mb-8">
+            Connect with skilled professionals for all your home service needs
+          </p>
+          <div className="flex flex-col sm:flex-row gap-4">
+            <button
+              onClick={handleBrowseAllClick}
+              className="bg-white text-blue-600 px-6 py-3 rounded-lg font-semibold hover:bg-blue-50 transition-colors flex items-center justify-center gap-2"
+            >
+              Browse Services <FaArrowRight />
+            </button>
+            {!currentUser && (
+              <button
+                onClick={() => navigate("/signup")}
+                className="bg-transparent border-2 border-white text-white px-6 py-3 rounded-lg font-semibold hover:bg-white/10 transition-colors"
+              >
+                Sign Up Now
+              </button>
+            )}
+          </div>
+        </div>
+      </section>
+
+      {/* Popular Categories Section */}
+      <section className="mb-20">
+        <div className="flex justify-between items-center mb-8">
+          <div>
+            <h2 className="text-3xl md:text-4xl font-bold text-gray-800">
+              Popular Services
+            </h2>
+            <p className="text-gray-600 mt-2">
+              Most requested services this week
+            </p>
+          </div>
+          <button
+            onClick={handleBrowseAllClick}
+            className="text-blue-600 font-medium hover:text-blue-800 transition-colors flex items-center"
+          >
+            View All <FaArrowRight className="ml-2" />
+          </button>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {Array.isArray(popularCategories) && popularCategories.length > 0 ? (
+            popularCategories.map((category) => (
+              <button
+                key={category._id || category.id}
+                onClick={() =>
+                  handleCategorySelection(
+                    category._id || category.id,
+                    category.name
+                  )
+                }
+                className="group relative rounded-2xl overflow-hidden shadow-lg hover:shadow-xl transition-all duration-300"
+              >
+                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent z-10"></div>
+                <img
+                  src={
+                    category.thumbnail?.url || category.imageUrl || defaultImage
+                  }
+                  alt={`Popular ${category.name} service`}
+                  className="w-full h-64 object-cover transition-transform duration-500 group-hover:scale-110"
+                  onError={(e) => {
+                    e.target.src = defaultImage;
+                  }}
+                />
+                <div className="absolute bottom-0 left-0 p-6 z-20 w-full">
+                  <div className="flex items-center gap-2 mb-2">
+                    <FaStar className="text-yellow-400" />
+                    <span className="text-white/90 text-sm">
+                      {category.viewCount || 0} views
+                    </span>
+                  </div>
+                  <h3 className="text-2xl font-bold text-white mb-1">
+                    {category.name}
+                  </h3>
+                  <p className="text-white/80 text-sm">
+                    Browse professionals →
+                  </p>
+                </div>
+              </button>
+            ))
+          ) : (
+            <p className="text-gray-500 col-span-full text-center py-8">
+              No popular categories available
+            </p>
+          )}
+        </div>
       </section>
 
       {/* All Service Categories */}
       <section className="mb-20">
         <div className="flex justify-between items-center mb-8">
-          <h2 className="text-3xl md:text-4xl font-bold text-gray-800">
-            Service Categories
-          </h2>
-          <button
-            onClick={handleBrowseAllClick}
-            className="text-blue-600 font-medium hover:text-blue-800 transition-colors flex items-center"
-          >
-            View All <span className="ml-1 text-xl">→</span>
-          </button>
+          <div>
+            <h2 className="text-3xl md:text-4xl font-bold text-gray-800">
+              All Services
+            </h2>
+            <p className="text-gray-600 mt-2">
+              Browse all available service categories
+            </p>
+          </div>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           {categories.map((category) => (
@@ -151,21 +242,24 @@ const ServiceCategoriesPage = () => {
                     e.target.src = defaultImage;
                   }}
                 />
-                <span className="absolute top-3 left-3 bg-black/70 text-white px-2 py-1 rounded-full text-xs">
-                  {category.viewCount} views
-                </span>
-                {category.isPopular && (
-                  <span className="absolute top-3 right-3 bg-yellow-400 text-yellow-900 px-3 py-1 rounded-full text-xs font-bold">
-                    Popular
+                <div className="absolute top-3 left-3 flex gap-2">
+                  <span className="bg-black/70 text-white px-2 py-1 rounded-full text-xs">
+                    {category.viewCount} views
                   </span>
-                )}
+                  {category.isPopular && (
+                    <span className="bg-yellow-400 text-yellow-900 px-3 py-1 rounded-full text-xs font-bold">
+                      Popular
+                    </span>
+                  )}
+                </div>
               </div>
               <div className="p-5">
-                <h3 className="text-xl font-semibold text-gray-800">
+                <h3 className="text-xl font-semibold text-gray-800 mb-2">
                   {category.name}
                 </h3>
-                <p className="mt-2 text-gray-600 text-sm">
-                  Browse professionals →
+                <p className="text-gray-600 text-sm flex items-center gap-1">
+                  Browse professionals{" "}
+                  <FaArrowRight className="text-blue-500" />
                 </p>
               </div>
             </button>
@@ -173,55 +267,8 @@ const ServiceCategoriesPage = () => {
         </div>
       </section>
 
-      {/* Trending Categories Section */}
-      <section className="mb-20">
-        <h2 className="text-3xl md:text-4xl font-bold text-gray-800 mb-8">
-          Trending This Week
-        </h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {Array.isArray(popularCategories) && popularCategories.length > 0 ? (
-            popularCategories.map((category) => (
-              <button
-                key={category._id || category.id}
-                onClick={() =>
-                  handleCategorySelection(
-                    category._id || category.id,
-                    category.name
-                  )
-                }
-                className="relative rounded-2xl overflow-hidden shadow-lg group h-full focus:outline-none focus:ring-2 focus:ring-white"
-              >
-                <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent z-10"></div>
-                <img
-                  src={
-                    category.thumbnail?.url || category.imageUrl || defaultImage
-                  }
-                  alt={`Popular ${category.name} service`}
-                  className="w-full h-64 object-cover transition-transform duration-500 group-hover:scale-105"
-                  onError={(e) => {
-                    e.target.src = defaultImage;
-                  }}
-                />
-                <div className="absolute bottom-0 left-0 p-6 z-20 w-full">
-                  <h3 className="text-2xl font-bold text-white mb-1">
-                    {category.name}
-                  </h3>
-                  <p className="text-white/80">
-                    {category.viewCount || 0} views this week
-                  </p>
-                </div>
-              </button>
-            ))
-          ) : (
-            <p className="text-gray-500 col-span-full text-center py-8">
-              No trending categories available
-            </p>
-          )}
-        </div>
-      </section>
-
       {/* How It Works Section */}
-      <section className="bg-gray-50 rounded-2xl p-8 md:p-12 mb-16">
+      <section className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl p-8 md:p-12 mb-16">
         <h2 className="text-3xl md:text-4xl font-bold text-gray-800 mb-12 text-center">
           How It Works
         </h2>
@@ -230,45 +277,61 @@ const ServiceCategoriesPage = () => {
             {
               title: "Choose a Service",
               description: "Browse our categories to find the service you need",
+              icon: <FaSearch className="text-2xl" />,
             },
             {
               title: "View Professionals",
               description:
                 "See available professionals with profiles and reviews",
+              icon: <FaUserTie className="text-2xl" />,
             },
             {
               title: "Book Your Service",
               description: "Select a professional and schedule your service",
+              icon: <FaCheckCircle className="text-2xl" />,
             },
           ].map((step, index) => (
-            <div key={index} className="text-center">
+            <div
+              key={index}
+              className="bg-white rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow"
+            >
               <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <span className="text-blue-600 text-xl font-bold">
-                  {index + 1}
-                </span>
+                <span className="text-blue-600">{step.icon}</span>
               </div>
-              <h3 className="text-xl font-semibold mb-2">{step.title}</h3>
-              <p className="text-gray-600">{step.description}</p>
+              <h3 className="text-xl font-semibold mb-2 text-center">
+                {step.title}
+              </h3>
+              <p className="text-gray-600 text-center">{step.description}</p>
             </div>
           ))}
         </div>
       </section>
 
       {/* Call to Action */}
-      <section className="bg-gradient-to-r from-blue-600 to-indigo-700 rounded-2xl p-8 md:p-12 text-center text-white">
+      <section className="bg-gradient-to-r from-blue-600 to-indigo-700 rounded-2xl p-8 md:p-12 text-white text-center">
         <h2 className="text-3xl md:text-4xl font-bold mb-4">
-          Ready to find your professional?
+          Ready to Get Started?
         </h2>
-        <p className="text-xl opacity-90 max-w-2xl mx-auto mb-8">
-          Join thousands of satisfied customers who found the perfect service
-          provider
+        <p className="text-xl opacity-90 mb-8 max-w-2xl mx-auto">
+          Join thousands of satisfied customers who found their perfect service
+          professional
         </p>
-        <button
-          onClick={handleBrowseAllClick}
-          className="bg-white text-blue-600 px-8 py-3 rounded-lg font-semibold text-lg hover:bg-blue-50 transition-all duration-300 shadow-lg hover:shadow-xl"
-        >
-          Browse Services
-        </button>
+        <div className="flex flex-col sm:flex-row gap-4 justify-center">
+          <button
+            onClick={handleBrowseAllClick}
+            className="bg-white text-blue-600 px-8 py-3 rounded-lg font-semibold hover:bg-blue-50 transition-colors"
+          >
+            Browse Services
+          </button>
+          {!currentUser && (
+            <button
+              onClick={() => navigate("/signup")}
+              className="bg-transparent border-2 border-white text-white px-8 py-3 rounded-lg font-semibold hover:bg-white/10 transition-colors"
+            >
+              Sign Up Now
+            </button>
+          )}
+        </div>
       </section>
     </main>
   );

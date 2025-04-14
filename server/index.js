@@ -14,7 +14,7 @@ const app = express();
 // Middleware
 const corsOptions = {
   origin: "http://localhost:5173", // Explicitly set your frontend origin
-  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"],
   credentials: true,
   optionsSuccessStatus: 200,
@@ -45,17 +45,44 @@ const verifyUser = async (req, res, next) => {
 
     const token = authHeader.split(" ")[1].trim();
     const decodedToken = await admin.auth().verifyIdToken(token);
-    const user = await User.findOne({ firebaseUID: decodedToken.uid }).lean();
+
+    // Important: Use exec() for better error handling
+    const user = await User.findOne({ firebaseUID: decodedToken.uid })
+      .select("firebaseUID role")
+      .lean()
+      .exec();
 
     if (!user) {
-      return res.status(403).json({ error: "User access required" });
+      return res.status(404).json({
+        error: "User not found in database",
+        action: "register",
+      });
     }
 
-    req.user = user;
+    req.user = {
+      firebaseUID: user.firebaseUID,
+      role: user.role,
+    };
+
     next();
   } catch (error) {
-    console.error("Authentication error:", error);
-    res.status(401).json({ error: "Authentication failed" });
+    console.error("Authentication middleware error:", {
+      message: error.message,
+      code: error.code,
+      stack: error.stack,
+    });
+
+    if (error.code === "auth/id-token-expired") {
+      return res
+        .status(401)
+        .json({ error: "Token expired", action: "refresh" });
+    }
+
+    res.status(401).json({
+      error: "Authentication failed",
+      details:
+        process.env.NODE_ENV === "development" ? error.message : undefined,
+    });
   }
 };
 // Admin Middleware (verify admin status)
@@ -88,7 +115,12 @@ const verifyAdmin = async (req, res, next) => {
       return res.status(403).json({ error: "Admin access required" });
     }
 
-    req.user = user;
+    // Set the user data in the request
+    req.user = {
+      ...user,
+      _id: user._id.toString(), // Ensure _id is a string
+    };
+
     next();
   } catch (error) {
     console.error("Authentication error:", error);
@@ -104,6 +136,71 @@ const verifyAdmin = async (req, res, next) => {
     });
   }
 };
+// Update user role (for both users and admins)
+app.patch("/api/users/:firebaseId/role", verifyUser, async (req, res) => {
+  try {
+    const { role } = req.body;
+    const { firebaseId } = req.params;
+
+    // Validate role
+    if (!["client", "worker"].includes(role)) {
+      return res.status(400).json({ error: "Invalid role specified" });
+    }
+
+    // Find by firebaseId instead of MongoDB _id
+    const updatedUser = await User.findOneAndUpdate(
+      { firebaseUID: firebaseId }, // Query by firebaseId
+      { role },
+      { new: true }
+    );
+
+    if (!updatedUser) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    res.json(updatedUser);
+  } catch (error) {
+    console.error("Error updating user role:", error);
+    res.status(500).json({ error: "Failed to update user role" });
+  }
+});
+
+// Get current user info
+app.get("/api/users/me", verifyUser, async (req, res) => {
+  try {
+    if (!req.user?.firebaseUID) {
+      return res.status(401).json({
+        success: false,
+        error: "Authentication required"
+      });
+    }
+
+    const user = await User.findOne(
+      { firebaseUID: req.user.firebaseUID },
+      { password: 0, __v: 0 }
+    ).lean();
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        error: "User not found",
+        action: "register"
+      });
+    }
+
+    res.json({
+      success: true,
+      data: user
+    });
+  } catch (error) {
+    console.error("Error fetching user:", error);
+    res.status(500).json({
+      success: false,
+      error: "Internal server error",
+      details: process.env.NODE_ENV === "development" ? error.message : undefined
+    });
+  }
+});
 
 // Routes
 app.post("/api/users", async (req, res) => {
@@ -160,15 +257,66 @@ app.get("/api/users/:id", async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
-app.get("/api/users/me", verifyAdmin, async (req, res) => {
+app.get("/api/users/me", verifyUser, async (req, res) => {
   try {
-    const user = await User.findById(req.user._id).select("-__v");
-    res.json(user);
+    if (!req.user?.firebaseUID) {
+      console.log('No firebaseUID in request');
+      return res.status(401).json({
+        success: false,
+        error: "Authentication required"
+      });
+    }
+
+    console.log('Fetching user with firebaseUID:', req.user.firebaseUID);
+    const user = await User.findOne(
+      { firebaseUID: req.user.firebaseUID },
+      { _id: 1, name: 1, email: 1, role: 1, firebaseUID: 1 }
+    ).lean();
+
+    if (!user) {
+      console.log('User not found in database');
+      return res.status(404).json({
+        success: false,
+        error: "User not found",
+        action: "register"
+      });
+    }
+
+    console.log('User found:', { role: user.role, firebaseUID: user.firebaseUID });
+    res.json({
+      success: true,
+      data: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        firebaseUID: user.firebaseUID
+      }
+    });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error("Error in /api/users/me:", error);
+    res.status(500).json({
+      success: false,
+      error: "Internal server error",
+      details: process.env.NODE_ENV === "development" ? error.message : undefined
+    });
   }
 });
 // Add this before your admin routes
+// Get user by Firebase UID
+app.get("/api/users/firebase/:firebaseUID", verifyUser, async (req, res) => {
+  try {
+    const user = await User.findOne({ firebaseUID: req.params.firebaseUID });
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+    res.json(user);
+  } catch (error) {
+    console.error("Error fetching user by Firebase UID:", error);
+    res.status(500).json({ error: "Failed to fetch user" });
+  }
+});
+
 app.get("/api/users/me/info", cors(corsOptions), async (req, res) => {
   try {
     const token = req.headers.authorization?.split(" ")[1];

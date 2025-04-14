@@ -9,6 +9,7 @@ import HiringPage from "./pages/HiringPage";
 import AdminDashboard from "./pages/AdminDashboard";
 import ProtectedAdminRoute from "./components/ProtectedAdmin";
 import WorkerProfilePage from "./pages/WorkerProfilePage";
+import ErrorPage from "./pages/ErrorPage";
 
 function App() {
   return (
@@ -17,6 +18,7 @@ function App() {
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/signin" element={<SignIn />} />
+          <Route path="/error" element={<ErrorPage />} />
           <Route path="/signup" element={<SignUp />} />
           <Route path="/location" element={<MapComponent />} />
           <Route path="/services/:categoryName" element={<WorkerList />} />

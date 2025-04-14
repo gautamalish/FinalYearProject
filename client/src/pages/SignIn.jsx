@@ -18,7 +18,6 @@ const SignIn = () => {
   const [googleLoading, setGoogleLoading] = useState(false);
   const [verifyingAdmin, setVerifyingAdmin] = useState(false);
   const [error, setError] = useState("");
-  const from = location.state?.from?.pathname || "/";
 
   // Auto-refresh token every 55 minutes
   useEffect(() => {
@@ -61,7 +60,7 @@ const SignIn = () => {
       if (response.data.role === "admin") {
         navigate("/admin");
       } else {
-        navigate(from);
+        navigate("/");
       }
     } catch (error) {
       if (
@@ -103,7 +102,7 @@ const SignIn = () => {
       if (response.data.role === "admin") {
         navigate("/admin");
       } else {
-        navigate(from);
+        navigate("/");
       }
     } catch (error) {
       let errorMessage = "Sign in failed";

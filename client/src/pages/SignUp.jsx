@@ -9,8 +9,12 @@ import {
 } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import { auth } from "../config/firebase-config";
-import { getAuth, GoogleAuthProvider, signInWithPopup } from "firebase/auth";
-import { createUserWithEmailAndPassword } from "firebase/auth";
+import {
+  getAuth,
+  GoogleAuthProvider,
+  signInWithPopup,
+  createUserWithEmailAndPassword,
+} from "firebase/auth";
 import axios from "axios";
 
 const SignUp = () => {
@@ -36,7 +40,6 @@ const SignUp = () => {
     e.preventDefault();
     try {
       // 1. Firebase Authentication
-      const auth = getAuth();
       const userCredential = await createUserWithEmailAndPassword(
         auth,
         formData.email,
@@ -48,6 +51,7 @@ const SignUp = () => {
       // 2. Save to MongoDB
       await axios.post("http://localhost:3000/api/users", {
         token,
+        firebaseUID: user.uid,
         name: formData.name,
         email: formData.email,
         phone: formData.phone,
@@ -73,6 +77,7 @@ const SignUp = () => {
       // Send user data to backend
       await axios.post("http://localhost:3000/api/users", {
         token,
+        firebaseUID: user.uid,
         name: user.displayName,
         email: user.email,
         phone: user.phoneNumber || "", // Google might not provide a phone number

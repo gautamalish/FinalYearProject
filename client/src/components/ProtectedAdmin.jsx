@@ -5,7 +5,7 @@ import { useAuth } from "../contexts/AuthContext";
 
 const ProtectedAdminRoute = ({ children }) => {
   const navigate = useNavigate();
-  const { currentUser } = useAuth();
+  const { currentUser, token, refreshToken } = useAuth();
   const [isVerified, setIsVerified] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -17,27 +17,67 @@ const ProtectedAdminRoute = ({ children }) => {
           return;
         }
 
-        const token = await user.getIdToken();
+        const currentToken = token || (await refreshToken());
+        if (!currentToken) {
+          navigate("/signin");
+          return;
+        }
 
-        const res = await axios.get("http://localhost:3000/api/users/me/info", {
-          headers: { Authorization: `Bearer ${token}` },
+        const res = await axios.get("http://localhost:3000/api/users/me", {
+          headers: {
+            Authorization: `Bearer ${currentToken}`,
+            "Content-Type": "application/json",
+          },
+          timeout: 10000, // 10 second timeout
         });
 
-        if (res.data.role !== "admin") {
-          navigate("/");
+        if (!res.data?.success) {
+          throw new Error(res.data?.error || "Invalid response from server");
+        }
+
+        if (res.data.data?.role !== "admin") {
+          navigate("/", {
+            state: {
+              message: "Access Denied",
+              details: "Admin privileges required",
+            },
+          });
           return;
         }
 
         setIsVerified(true);
       } catch (error) {
-        console.error("Admin verification failed:", error);
-        navigate("/signin");
+        console.error("Admin verification error details:", {
+          message: error.message,
+          response: error.response?.data,
+          status: error.response?.status,
+          config: error.config,
+        });
+
+        if (error.response?.status === 401) {
+          navigate("/signin");
+        } else if (error.response?.status === 404) {
+          navigate("/register");
+        } else {
+          navigate("/error", {
+            state: {
+              message: "Verification Failed",
+              details: error.response?.data?.error || error.message,
+            },
+            replace: true,
+          });
+        }
       } finally {
         setLoading(false);
       }
     };
 
-    checkAdmin(currentUser);
+    if (currentUser) {
+      checkAdmin(currentUser);
+    } else {
+      setLoading(false);
+      navigate("/signin");
+    }
   }, [navigate, currentUser]);
 
   if (loading) {
