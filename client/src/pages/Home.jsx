@@ -4,7 +4,6 @@ import Main from "../components/home/Main";
 const Home = () => {
   return (
     <main>
-      <Header />
       <Main />
     </main>
   );

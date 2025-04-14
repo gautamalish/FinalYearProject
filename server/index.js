@@ -391,6 +391,22 @@ app.post(
     }
   }
 );
+// Get all workers
+app.get("/api/workers", async (req, res) => {
+  try {
+    const workers = await User.find({ role: "worker" })
+      .select("name email phone profilePicture rating categories firebaseUID createdAt")
+      .populate("categories", "name description thumbnail")
+      .lean();
+
+    console.log('Found workers:', workers); // Debug log
+    res.json(workers);
+  } catch (error) {
+    console.error("Error fetching workers:", error);
+    res.status(500).json({ error: "Failed to fetch workers" });
+  }
+});
+
 // Get workers by category
 app.get("/api/workers/:categoryId", async (req, res) => {
   try {

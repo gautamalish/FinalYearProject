@@ -47,33 +47,25 @@ const Header = () => {
           </p>
         </div>
 
-        {/* Search bar */}
-        <div className="hidden sm:flex items-center bg-white/90 rounded-xl px-4 py-2 shadow-sm w-1/3 max-w-xl hover:shadow-md transition-all">
-          <FaSearch className="text-gray-500 mr-2" />
-          <input
-            type="text"
-            placeholder="Find services or professionals..."
-            className="w-full outline-none bg-transparent text-gray-700 placeholder-gray-400"
-          />
-        </div>
+        
 
         {/* Navigation Links */}
-        <div className="hidden md:flex items-center gap-6 text-white font-medium">
+        <div className="hidden md:flex items-center gap-8 text-white font-medium">
           <button
             onClick={() => navigate("/services")}
-            className="hover:text-yellow-300 transition-colors"
+            className="px-4 py-2 rounded-lg hover:bg-white/20 transition-colors"
           >
             Services
           </button>
           <button
             onClick={() => navigate("/professionals")}
-            className="hover:text-yellow-300 transition-colors"
+            className="px-4 py-2 rounded-lg hover:bg-white/20 transition-colors"
           >
             Professionals
           </button>
           <button
             onClick={() => navigate("/about")}
-            className="hover:text-yellow-300 transition-colors"
+            className="px-4 py-2 rounded-lg hover:bg-white/20 transition-colors"
           >
             About
           </button>
