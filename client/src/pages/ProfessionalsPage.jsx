@@ -1,12 +1,15 @@
 import React, { useState, useEffect } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import axios from "axios";
+import WorkerProfileModal from "../components/WorkerProfileModal";
 
 const ProfessionalsPage = () => {
   const { currentUser } = useAuth();
   const [workers, setWorkers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [selectedWorker, setSelectedWorker] = useState(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   useEffect(() => {
     const fetchWorkers = async () => {
@@ -116,7 +119,10 @@ const ProfessionalsPage = () => {
 
               <button 
                 className="mt-4 w-full bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition"
-                onClick={() => window.location.href = `/worker/${worker._id}`}
+                onClick={() => {
+                  setSelectedWorker(worker);
+                  setIsModalOpen(true);
+                }}
               >
                 View Full Profile
               </button>
@@ -130,6 +136,13 @@ const ProfessionalsPage = () => {
           </div>
         )}
       </div>
+
+      {/* Worker Profile Modal */}
+      <WorkerProfileModal 
+        worker={selectedWorker} 
+        isOpen={isModalOpen} 
+        onClose={() => setIsModalOpen(false)} 
+      />
     </div>
   );
 };

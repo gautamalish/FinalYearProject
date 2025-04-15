@@ -55,6 +55,7 @@ const SignUp = () => {
         name: formData.name,
         email: formData.email,
         phone: formData.phone,
+        role: "client"
       });
 
       navigate("/");
@@ -81,6 +82,7 @@ const SignUp = () => {
         name: user.displayName,
         email: user.email,
         phone: user.phoneNumber || "", // Google might not provide a phone number
+        role: "client"
       });
 
       navigate("/");

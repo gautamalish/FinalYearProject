@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useParams, useLocation } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import axios from "axios";
+import WorkerProfileModal from "../components/WorkerProfileModal";
 
 const WorkersList = () => {
   const { categoryName } = useParams();
@@ -11,6 +12,8 @@ const WorkersList = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const { currentUser } = useAuth();
+  const [selectedWorker, setSelectedWorker] = useState(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   useEffect(() => {
     const fetchWorkers = async () => {
@@ -104,7 +107,13 @@ const WorkersList = () => {
                   {worker.phone || "Not provided"}
                 </p>
               </div>
-              <button className="mt-4 w-full bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition">
+              <button 
+                className="mt-4 w-full bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition"
+                onClick={() => {
+                  setSelectedWorker(worker);
+                  setIsModalOpen(true);
+                }}
+              >
                 View Profile
               </button>
             </div>
@@ -117,6 +126,13 @@ const WorkersList = () => {
           </div>
         )}
       </div>
+
+      {/* Worker Profile Modal */}
+      <WorkerProfileModal 
+        worker={selectedWorker} 
+        isOpen={isModalOpen} 
+        onClose={() => setIsModalOpen(false)} 
+      />
     </div>
   );
 };

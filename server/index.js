@@ -3,8 +3,11 @@ const express = require("express");
 require("dotenv").config();
 const cors = require("cors");
 const admin = require("firebase-admin");
+const mongoose = require("mongoose");
 const connectDB = require("./conn/db");
 const User = require("./models/UserModel");
+const Client = require('./models/ClientModel');
+const Worker = require('./models/WorkerModel');
 const { storage, cloudinary } = require("./utils/cloudinary");
 const Category = require("./models/CategoryModel");
 const multer = require("multer");
@@ -137,7 +140,43 @@ const verifyAdmin = async (req, res, next) => {
   }
 };
 // Update user role (for both users and admins)
+// Profile update endpoint
+app.put("/api/users/profile", verifyUser, upload.single("profileImage"), async (req, res) => {
+  try {
+    const { firebaseUID } = req.user;
+    const { name, email, phone } = req.body;
+    
+    // Prepare update data
+    const updateData = { name, email, phone };
+    
+    // Handle profile image if uploaded
+    if (req.file) {
+      updateData.profilePicture = req.file.path;
+    }
+    
+    // Update user in database
+    const updatedUser = await User.findOneAndUpdate(
+      { firebaseUID },
+      updateData,
+      { new: true }
+    );
+    
+    if (!updatedUser) {
+      return res.status(404).json({ error: "User not found" });
+    }
+    
+    res.status(200).json(updatedUser);
+  } catch (error) {
+    console.error("Profile update error:", error);
+    res.status(500).json({ error: "Failed to update profile" });
+  }
+});
+
 app.patch("/api/users/:firebaseId/role", verifyUser, async (req, res) => {
+  // Start a MongoDB session for transaction
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
   try {
     const { role } = req.body;
     const { firebaseId } = req.params;
@@ -147,21 +186,137 @@ app.patch("/api/users/:firebaseId/role", verifyUser, async (req, res) => {
       return res.status(400).json({ error: "Invalid role specified" });
     }
 
-    // Find by firebaseId instead of MongoDB _id
-    const updatedUser = await User.findOneAndUpdate(
-      { firebaseUID: firebaseId }, // Query by firebaseId
-      { role },
-      { new: true }
-    );
+    // Find user by firebaseId
+    const user = await User.findOne({ firebaseUID: firebaseId }).lean();
 
-    if (!updatedUser) {
+    if (!user) {
       return res.status(404).json({ error: "User not found" });
     }
 
-    res.json(updatedUser);
+    // Check if the role is actually changing
+    if (user.role === role) {
+      return res.status(400).json({ error: "User already has this role" });
+    }
+
+    // Update user role
+    const updatedUser = await User.findOneAndUpdate(
+      { firebaseUID: firebaseId },
+      { role },
+      { new: true, session }
+    );
+
+    // If changing to worker, ensure they exist in workers collection
+    if (role === "worker") {
+      await Worker.findOneAndUpdate(
+        { firebaseUID: firebaseId },
+        { $setOnInsert: { firebaseUID: firebaseId, name: user.name, email: user.email } },
+        { upsert: true, session }
+      );
+    } else if (user.role === "worker") {
+      // If changing from worker to client, remove from workers collection
+      await Worker.deleteOne({ firebaseUID: firebaseId }, { session });
+    }
+
+    // Handle role change from client to worker
+    if (role === "worker") {
+      // Check if user exists in Client collection
+      const clientData = await Client.findOne({ firebaseUID: firebaseId }).lean();
+
+      // Create worker document with data from user and client
+      const workerData = {
+        firebaseUID: user.firebaseUID,
+        name: user.name,
+        email: user.email,
+        phone: user.phone || "",
+        categories: req.body.categories || [],
+        profileImage: req.body.profilePicture || "",
+        rating: 0,
+        completedJobs: 0,
+        // Add other worker-specific fields with defaults
+        title: req.body.title || "",
+        bio: req.body.bio || "",
+        availability: {
+          days: {
+            monday: false,
+            tuesday: false,
+            wednesday: false,
+            thursday: false,
+            friday: false,
+            saturday: false,
+            sunday: false,
+          },
+          hours: {
+            start: "09:00",
+            end: "17:00",
+          },
+        },
+      };
+
+      // Create new worker document
+      const newWorker = new Worker(workerData);
+      await newWorker.save({ session });
+
+      // Delete client document if it exists
+      if (clientData) {
+        await Client.findOneAndDelete({ firebaseUID: firebaseId }, { session });
+      }
+
+      // Update user document with new role and worker-specific fields
+      const updatedUser = await User.findOneAndUpdate(
+        { firebaseUID: firebaseId },
+        { 
+          role,
+          categories: req.body.categories || [],
+          profilePicture: req.body.profilePicture || ""
+        },
+        { new: true, session }
+      );
+
+      await session.commitTransaction();
+      res.json(updatedUser);
+    }
+    // Handle role change from worker to client
+    else if (role === "client") {
+      // Check if user exists in Worker collection
+      const workerData = await Worker.findOne({ firebaseUID: firebaseId }).lean();
+
+      // Create client document with data from user and worker
+      const clientData = {
+        firebaseUID: user.firebaseUID,
+        name: user.name,
+        email: user.email,
+        phone: user.phone || "",
+        jobsRequested: 0,
+      };
+
+      // Create new client document
+      const newClient = new Client(clientData);
+      await newClient.save({ session });
+
+      // Delete worker document if it exists
+      if (workerData) {
+        await Worker.findOneAndDelete({ firebaseUID: firebaseId }, { session });
+      }
+
+      // Update user document with new role and remove worker-specific fields
+      const updatedUser = await User.findOneAndUpdate(
+        { firebaseUID: firebaseId },
+        { 
+          role,
+          $unset: { categories: "", profilePicture: "" }
+        },
+        { new: true, session }
+      );
+
+      await session.commitTransaction();
+      res.json(updatedUser);
+    }
   } catch (error) {
+    await session.abortTransaction();
     console.error("Error updating user role:", error);
     res.status(500).json({ error: "Failed to update user role" });
+  } finally {
+    session.endSession();
   }
 });
 
@@ -202,6 +357,8 @@ app.get("/api/users/me", verifyUser, async (req, res) => {
   }
 });
 
+// Client and Worker models already imported at the top of the file
+
 // Routes
 app.post("/api/users", async (req, res) => {
   try {
@@ -221,23 +378,70 @@ app.post("/api/users", async (req, res) => {
     if (existingUser) {
       return res.status(200).json(existingUser);
     }
+
     const phone =
       req.body.phone && req.body.phone.trim() !== "" ? req.body.phone : "N/A";
+    const name = req.body.name || decodedToken.name || '';
+    const email = req.body.email || decodedToken.email || '';
+    const role = req.body.role === "worker" ? "worker" : "client";
 
-    // Create new user
+    // Create base user document
     const newUser = new User({
       firebaseUID,
-      name: req.body.name,
-      phone: phone,
-      email: req.body.email,
-      role: req.body.role || "client",
+      name,
+      phone,
+      email,
+      role,
     });
-    if (req.body.role === "worker") {
-      newUser.categories = req.body.categories || [];
-      newUser.profilePicture = req.body.profilePicture || "";
-    }
 
-    await newUser.save();
+    // Start a MongoDB session for transaction
+    const session = await mongoose.startSession();
+    session.startTransaction();
+
+    try {
+      // Save the base user document
+      await newUser.save({ session });
+
+      // Add worker-specific fields if role is worker
+      if (role === "worker") {
+        newUser.categories = req.body.categories || [];
+        newUser.profilePicture = req.body.profilePicture || "";
+        newUser.rating = 0;
+        
+        // Create worker document
+        const newWorker = new Worker({
+          firebaseUID,
+          name,
+          phone,
+          email,
+          categories: req.body.categories || [],
+          profilePicture: req.body.profilePicture || "",
+          rating: 0,
+          jobsCompleted: 0
+        });
+        await newWorker.save({ session });
+      } else {
+        // Create client document
+        const newClient = new Client({
+          firebaseUID,
+          name,
+          phone,
+          email,
+          jobsRequested: 0
+        });
+        await newClient.save({ session });
+      }
+
+      // Commit the transaction
+      await session.commitTransaction();
+    } catch (error) {
+      // If there's an error, abort the transaction
+      await session.abortTransaction();
+      throw error;
+    } finally {
+      // End the session
+      session.endSession();
+    }
     console.log("User saved to MongoDB:", newUser);
     res.status(201).json(newUser);
   } catch (error) {
@@ -391,6 +595,92 @@ app.post(
     }
   }
 );
+// Worker Registration Endpoint
+app.post("/api/workers/register", verifyUser, upload.single("profileImage"), async (req, res) => {
+  // Start a MongoDB session for transaction
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
+    const { phone, nationality, residence, category } = req.body;
+    const firebaseUID = req.user.firebaseUID;
+
+    // Find user by firebaseUID
+    const user = await User.findOne({ firebaseUID }).session(session);
+
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    // Check if user is already a worker
+    if (user.role === "worker") {
+      return res.status(400).json({ error: "User is already registered as a worker" });
+    }
+
+    // Check if user exists in Client collection
+    const clientData = await Client.findOne({ firebaseUID }).lean();
+
+    // Create worker document with data from user and form
+    const workerData = {
+      firebaseUID: user.firebaseUID,
+      name: user.name,
+      email: user.email,
+      phone: phone || "",
+      categories: category ? [category] : [],
+      profileImage: req.file ? req.file.path : "",
+      rating: 0,
+      completedJobs: 0,
+      // Add other worker-specific fields with defaults
+      title: "",
+      bio: "",
+      availability: {
+        days: {
+          monday: false,
+          tuesday: false,
+          wednesday: false,
+          thursday: false,
+          friday: false,
+          saturday: false,
+          sunday: false,
+        },
+        hours: {
+          start: "09:00",
+          end: "17:00",
+        },
+      },
+    };
+
+    // Create new worker document
+    const newWorker = new Worker(workerData);
+    await newWorker.save({ session });
+
+    // Delete client document if it exists
+    if (clientData) {
+      await Client.findOneAndDelete({ firebaseUID }, { session });
+    }
+
+    // Update user document with new role and worker-specific fields
+    const updatedUser = await User.findOneAndUpdate(
+      { firebaseUID },
+      { 
+        role: "worker",
+        categories: category ? [category] : [],
+        profilePicture: req.file ? req.file.path : ""
+      },
+      { new: true, session }
+    );
+
+    await session.commitTransaction();
+    res.status(201).json(updatedUser);
+  } catch (error) {
+    await session.abortTransaction();
+    console.error("Error registering worker:", error);
+    res.status(500).json({ error: "Failed to register as worker" });
+  } finally {
+    session.endSession();
+  }
+});
+
 // Get all workers
 app.get("/api/workers", async (req, res) => {
   try {

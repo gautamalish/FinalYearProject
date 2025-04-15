@@ -1,10 +1,12 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
 import { fetchCategories } from "../../services/admin";
 import axios from "axios";
 import defaultImage from "../../assets/gardener.jpg";
 import { fetchPopularCategories } from "../../services/admin";
+import { motion } from "framer-motion";
+import { useInView } from "react-intersection-observer";
 import {
   FaSearch,
   FaUserTie,
@@ -12,6 +14,32 @@ import {
   FaArrowRight,
   FaCheckCircle,
 } from "react-icons/fa";
+
+// Animation variants
+const fadeInUp = {
+  hidden: { opacity: 0, y: 20 },
+  visible: { opacity: 1, y: 0 }
+};
+
+const staggerContainer = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.2
+    }
+  }
+};
+
+const scaleIn = {
+  hidden: { scale: 0.8, opacity: 0 },
+  visible: { scale: 1, opacity: 1 }
+};
+
+const slideIn = {
+  hidden: { x: -60, opacity: 0 },
+  visible: { x: 0, opacity: 1 }
+};
 
 const ServiceCategoriesPage = () => {
   const [categories, setCategories] = useState([]);
@@ -116,58 +144,96 @@ const ServiceCategoriesPage = () => {
   }
 
   return (
-    <main className="max-w-[100rem] mx-auto mt-8 px-4 sm:px-6 lg:px-8 xl:px-12">
+    <motion.main 
+      initial="hidden"
+      animate="visible"
+      className="max-w-[100rem] mx-auto mt-8 px-4 sm:px-6 lg:px-8 xl:px-12"
+    >
       {/* Hero Banner */}
-      <section className="mb-16 relative overflow-hidden rounded-2xl">
-        <div className="absolute inset-0 bg-gradient-to-r from-blue-600 to-indigo-700 opacity-90"></div>
-        <div className="relative z-10 p-8 md:p-12 lg:p-16 text-white">
-          <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-6 max-w-2xl">
+      <motion.section 
+        variants={fadeInUp}
+        className="mb-16 relative overflow-hidden rounded-2xl transform hover:scale-[1.02] transition-transform duration-500"
+      >
+        <div className="absolute inset-0 bg-gradient-to-r from-blue-600 to-indigo-700 opacity-90 animate-gradient"></div>
+        <motion.div 
+          className="relative z-10 p-8 md:p-12 lg:p-16 text-white"
+          variants={staggerContainer}
+        >
+          <motion.h1 
+            variants={slideIn}
+            className="text-4xl md:text-5xl lg:text-6xl font-bold mb-6 max-w-2xl bg-clip-text text-transparent bg-gradient-to-r from-white to-blue-100"
+          >
             Find Trusted Home Service Professionals
-          </h1>
-          <p className="text-xl md:text-2xl opacity-90 max-w-2xl mb-8">
+          </motion.h1>
+          <motion.p 
+            variants={slideIn}
+            className="text-xl md:text-2xl opacity-90 max-w-2xl mb-8 leading-relaxed"
+          >
             Connect with skilled professionals for all your home service needs
-          </p>
-          <div className="flex flex-col sm:flex-row gap-4">
-            <button
+          </motion.p>
+          <motion.div 
+            variants={scaleIn}
+            className="flex flex-col sm:flex-row gap-4"
+          >
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
               onClick={handleBrowseAllClick}
-              className="bg-white text-blue-600 px-6 py-3 rounded-lg font-semibold hover:bg-blue-50 transition-colors flex items-center justify-center gap-2"
+              className="bg-white text-blue-600 px-6 py-3 rounded-lg font-semibold hover:bg-blue-50 transition-all duration-300 flex items-center justify-center gap-2 shadow-lg hover:shadow-xl"
             >
-              Browse Services <FaArrowRight />
-            </button>
+              Browse Services <FaArrowRight className="animate-bounce-x" />
+            </motion.button>
             {!currentUser && (
-              <button
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
                 onClick={() => navigate("/signup")}
-                className="bg-transparent border-2 border-white text-white px-6 py-3 rounded-lg font-semibold hover:bg-white/10 transition-colors"
+                className="bg-transparent border-2 border-white text-white px-6 py-3 rounded-lg font-semibold hover:bg-white/10 transition-all duration-300 backdrop-blur-sm"
               >
                 Sign Up Now
-              </button>
+              </motion.button>
             )}
-          </div>
-        </div>
-      </section>
+          </motion.div>
+        </motion.div>
+      </motion.section>
 
       {/* Popular Categories Section */}
-      <section className="mb-20">
-        <div className="flex justify-between items-center mb-8">
-          <div>
-            <h2 className="text-3xl md:text-4xl font-bold text-gray-800">
+      <motion.section 
+        variants={fadeInUp}
+        className="mb-20"
+      >
+        <motion.div 
+          variants={staggerContainer}
+          className="flex justify-between items-center mb-8"
+        >
+          <motion.div variants={slideIn}>
+            <h2 className="text-3xl md:text-4xl font-bold text-gray-800 bg-gradient-to-r from-blue-600 to-indigo-700 bg-clip-text text-transparent">
               Popular Services
             </h2>
-            <p className="text-gray-600 mt-2">
+            <p className="text-gray-600 mt-2 font-medium">
               Most requested services this week
             </p>
-          </div>
-          <button
+          </motion.div>
+          <motion.button
+            variants={scaleIn}
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
             onClick={handleBrowseAllClick}
-            className="text-blue-600 font-medium hover:text-blue-800 transition-colors flex items-center"
+            className="text-blue-600 font-medium hover:text-blue-800 transition-all duration-300 flex items-center group"
           >
-            View All <FaArrowRight className="ml-2" />
-          </button>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            View All <FaArrowRight className="ml-2 transform group-hover:translate-x-1 transition-transform" />
+          </motion.button>
+        </motion.div>
+        <motion.div 
+          variants={staggerContainer}
+          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6"
+        >
           {Array.isArray(popularCategories) && popularCategories.length > 0 ? (
             popularCategories.map((category) => (
-              <button
+              <motion.button
+                variants={scaleIn}
+                whileHover={{ scale: 1.03 }}
+                whileTap={{ scale: 0.98 }}
                 key={category._id || category.id}
                 onClick={() =>
                   handleCategorySelection(
@@ -175,110 +241,143 @@ const ServiceCategoriesPage = () => {
                     category.name
                   )
                 }
-                className="group relative rounded-2xl overflow-hidden shadow-lg hover:shadow-xl transition-all duration-300"
+                className="group relative rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-500 transform"
               >
-                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent z-10"></div>
+                <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent z-10 group-hover:opacity-75 transition-opacity duration-500"></div>
                 <img
                   src={
                     category.thumbnail?.url || category.imageUrl || defaultImage
                   }
                   alt={`Popular ${category.name} service`}
-                  className="w-full h-64 object-cover transition-transform duration-500 group-hover:scale-110"
+                  className="w-full h-64 object-cover transition-transform duration-700 group-hover:scale-110"
                   onError={(e) => {
                     e.target.src = defaultImage;
                   }}
                 />
-                <div className="absolute bottom-0 left-0 p-6 z-20 w-full">
+                <div className="absolute bottom-0 left-0 p-6 z-20 w-full transform transition-transform duration-500 group-hover:translate-y-[-8px]">
                   <div className="flex items-center gap-2 mb-2">
-                    <FaStar className="text-yellow-400" />
-                    <span className="text-white/90 text-sm">
-                      {category.viewCount || 0} views
-                    </span>
+                    <FaStar className="text-yellow-400 animate-pulse" />
+                    {popularCategories.slice(0, 3).some(c => c._id === category._id || c.id === category.id) && (
+                      <span className="bg-yellow-500 text-white text-xs font-semibold px-3 py-1 rounded-full shadow-lg">
+                        Popular
+                      </span>
+                    )}
                   </div>
-                  <h3 className="text-2xl font-bold text-white mb-1">
+                  <h3 className="text-2xl font-bold text-white mb-2 group-hover:text-yellow-300 transition-colors duration-300">
                     {category.name}
                   </h3>
-                  <p className="text-white/80 text-sm">
-                    Browse professionals →
+                  <p className="text-white/90 text-sm flex items-center gap-2 group-hover:text-yellow-200 transition-colors duration-300">
+                    Browse professionals
+                    <FaArrowRight className="transform group-hover:translate-x-1 transition-transform duration-300" />
                   </p>
                 </div>
-              </button>
+              </motion.button>
             ))
           ) : (
-            <p className="text-gray-500 col-span-full text-center py-8">
+            <motion.p 
+              variants={fadeInUp}
+              className="text-gray-500 col-span-full text-center py-8 animate-pulse"
+            >
               No popular categories available
-            </p>
+            </motion.p>
           )}
-        </div>
-      </section>
+        </motion.div>
+      </motion.section>
 
       {/* All Service Categories */}
-      <section className="mb-20">
-        <div className="flex justify-between items-center mb-8">
-          <div>
-            <h2 className="text-3xl md:text-4xl font-bold text-gray-800">
+      <motion.section 
+        variants={fadeInUp}
+        className="mb-20"
+      >
+        <motion.div 
+          variants={staggerContainer}
+          className="flex justify-between items-center mb-8"
+        >
+          <motion.div variants={slideIn}>
+            <h2 className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-blue-600 to-indigo-700 bg-clip-text text-transparent">
               Services
             </h2>
-            <p className="text-gray-600 mt-2">
+            <p className="text-gray-600 mt-2 font-medium">
               Browse all available service categories
             </p>
-          </div>
-          <button
+          </motion.div>
+          <motion.button
+            variants={scaleIn}
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
             onClick={handleBrowseAllClick}
-            className="text-blue-600 font-medium hover:text-blue-800 transition-colors flex items-center"
+            className="text-blue-600 font-medium hover:text-blue-800 transition-all duration-300 flex items-center group"
           >
-            View All <FaArrowRight className="ml-2" />
-          </button>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            View All <FaArrowRight className="ml-2 transform group-hover:translate-x-1 transition-transform" />
+          </motion.button>
+        </motion.div>
+        <motion.div 
+          variants={staggerContainer}
+          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"
+        >
           {categories.map((category) => (
-            <button
+            <motion.button
+              variants={scaleIn}
+              whileHover={{ scale: 1.03 }}
+              whileTap={{ scale: 0.98 }}
               key={category.id}
               onClick={() =>
                 handleCategorySelection(category.id, category.name)
               }
-              className="group bg-white rounded-2xl overflow-hidden shadow-md hover:shadow-xl transition-all duration-300 hover:-translate-y-1 border border-gray-100 text-left focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="group bg-white rounded-2xl overflow-hidden shadow-md hover:shadow-2xl transition-all duration-500 hover:-translate-y-2 border border-gray-100 text-left focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <div className="relative overflow-hidden h-48">
                 <img
                   src={category.imageUrl}
                   alt={`${category.name} service`}
-                  className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                  className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
                   onError={(e) => {
                     e.target.src = defaultImage;
                   }}
                 />
                 <div className="absolute top-3 left-3 flex gap-2">
-                  <span className="bg-black/70 text-white px-2 py-1 rounded-full text-xs">
-                    {category.viewCount} views
-                  </span>
                   {category.isPopular && (
-                    <span className="bg-yellow-400 text-yellow-900 px-3 py-1 rounded-full text-xs font-bold">
+                    <motion.span 
+                      initial={{ opacity: 0, scale: 0.8 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      className="bg-yellow-400 text-yellow-900 px-3 py-1 rounded-full text-xs font-bold shadow-lg"
+                    >
                       Popular
-                    </span>
+                    </motion.span>
                   )}
                 </div>
               </div>
-              <div className="p-5">
-                <h3 className="text-xl font-semibold text-gray-800 mb-2">
+              <motion.div 
+                className="p-5 transform transition-transform duration-300 group-hover:translate-y-[-4px]"
+              >
+                <h3 className="text-xl font-semibold text-gray-800 mb-2 group-hover:text-blue-600 transition-colors duration-300">
                   {category.name}
                 </h3>
-                <p className="text-gray-600 text-sm flex items-center gap-1">
-                  Browse professionals{" "}
-                  <FaArrowRight className="text-blue-500" />
+                <p className="text-gray-600 text-sm flex items-center gap-2 group-hover:text-blue-500 transition-colors duration-300">
+                  Browse professionals
+                  <FaArrowRight className="transform group-hover:translate-x-1 transition-transform duration-300" />
                 </p>
-              </div>
-            </button>
+              </motion.div>
+            </motion.button>
           ))}
-        </div>
-      </section>
+        </motion.div>
+      </motion.section>
 
       {/* How It Works Section */}
-      <section className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl p-8 md:p-12 mb-16">
-        <h2 className="text-3xl md:text-4xl font-bold text-gray-800 mb-12 text-center">
+      <motion.section 
+        variants={fadeInUp}
+        className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl p-8 md:p-12 mb-16 shadow-lg hover:shadow-xl transition-shadow duration-500"
+      >
+        <motion.h2 
+          variants={slideIn}
+          className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-blue-600 to-indigo-700 bg-clip-text text-transparent mb-12 text-center"
+        >
           How It Works
-        </h2>
-        <div className="grid md:grid-cols-3 gap-8">
+        </motion.h2>
+        <motion.div 
+          variants={staggerContainer}
+          className="grid md:grid-cols-3 gap-8"
+        >
           {[
             {
               title: "Choose a Service",
@@ -297,49 +396,72 @@ const ServiceCategoriesPage = () => {
               icon: <FaCheckCircle className="text-2xl" />,
             },
           ].map((step, index) => (
-            <div
+            <motion.div
               key={index}
-              className="bg-white rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow"
+              variants={scaleIn}
+              whileHover={{ scale: 1.05, y: -5 }}
+              className="bg-white rounded-xl p-6 shadow-md hover:shadow-xl transition-all duration-500 transform"
             >
-              <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <span className="text-blue-600">{step.icon}</span>
-              </div>
-              <h3 className="text-xl font-semibold mb-2 text-center">
+              <motion.div 
+                whileHover={{ rotate: 360 }}
+                transition={{ duration: 0.7 }}
+                className="w-16 h-16 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg"
+              >
+                <span className="text-white">{step.icon}</span>
+              </motion.div>
+              <h3 className="text-xl font-semibold mb-2 text-center text-gray-800">
                 {step.title}
               </h3>
-              <p className="text-gray-600 text-center">{step.description}</p>
-            </div>
+              <p className="text-gray-600 text-center leading-relaxed">{step.description}</p>
+            </motion.div>
           ))}
-        </div>
-      </section>
+        </motion.div>
+      </motion.section>
 
       {/* Call to Action */}
-      <section className="bg-gradient-to-r from-blue-600 to-indigo-700 rounded-2xl p-8 md:p-12 text-white text-center">
-        <h2 className="text-3xl md:text-4xl font-bold mb-4">
+      <motion.section 
+        variants={fadeInUp}
+        className="bg-gradient-to-r from-blue-600 to-indigo-700 rounded-2xl p-8 md:p-12 text-white text-center shadow-xl hover:shadow-2xl transition-shadow duration-500 transform hover:scale-[1.02]"
+      >
+        <motion.h2 
+          variants={slideIn}
+          className="text-3xl md:text-4xl font-bold mb-4 text-transparent bg-clip-text bg-gradient-to-r from-white to-blue-200"
+        >
           Ready to Get Started?
-        </h2>
-        <p className="text-xl opacity-90 mb-8 max-w-2xl mx-auto">
+        </motion.h2>
+        <motion.p 
+          variants={fadeInUp}
+          className="text-xl opacity-90 mb-8 max-w-2xl mx-auto leading-relaxed"
+        >
           Join thousands of satisfied customers who found their perfect service
           professional
-        </p>
-        <div className="flex flex-col sm:flex-row gap-4 justify-center">
-          <button
+        </motion.p>
+        <motion.div 
+          variants={staggerContainer}
+          className="flex flex-col sm:flex-row gap-4 justify-center"
+        >
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
             onClick={handleBrowseAllClick}
-            className="bg-white text-blue-600 px-8 py-3 rounded-lg font-semibold hover:bg-blue-50 transition-colors"
+            className="bg-white text-blue-600 px-8 py-3 rounded-lg font-semibold hover:bg-blue-50 transition-all duration-300 shadow-lg hover:shadow-xl flex items-center justify-center gap-2 group"
           >
             Browse Services
-          </button>
+            <FaArrowRight className="transform group-hover:translate-x-1 transition-transform duration-300" />
+          </motion.button>
           {!currentUser && (
-            <button
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
               onClick={() => navigate("/signup")}
-              className="bg-transparent border-2 border-white text-white px-8 py-3 rounded-lg font-semibold hover:bg-white/10 transition-colors"
+              className="bg-transparent border-2 border-white text-white px-8 py-3 rounded-lg font-semibold hover:bg-white/10 transition-all duration-300 backdrop-blur-sm"
             >
               Sign Up Now
-            </button>
+            </motion.button>
           )}
-        </div>
-      </section>
-    </main>
+        </motion.div>
+      </motion.section>
+    </motion.main>
   );
 };
 
