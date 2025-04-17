@@ -301,7 +301,7 @@ const JobDetails = () => {
                       setReviewError('');
                       
                       const token = await currentUser.getIdToken();
-                      await axios.post('/api/reviews/create',
+                      await axios.post('http://localhost:3000/api/reviews/create',
                         {
                           jobId: job._id,
                           rating: review.rating,

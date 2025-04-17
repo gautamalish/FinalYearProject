@@ -6,8 +6,9 @@ const admin = require("firebase-admin");
 const mongoose = require("mongoose");
 const connectDB = require("./conn/db");
 const User = require("./models/UserModel");
-const Client = require('./models/ClientModel');
-const Worker = require('./models/WorkerModel');
+const Client = require("./models/ClientModel");
+const Worker = require("./models/WorkerModel");
+const Review = require("./models/ReviewModel");
 const { storage, cloudinary } = require("./utils/cloudinary");
 const Category = require("./models/CategoryModel");
 const multer = require("multer");
@@ -39,12 +40,14 @@ admin.initializeApp({
 connectDB();
 
 // Import routes
-const notificationRoutes = require('./routes/notificationRoutes');
-const jobRoutes = require('./routes/jobRoutes');
+const notificationRoutes = require("./routes/notificationRoutes");
+const jobRoutes = require("./routes/jobRoutes");
+const reviewRoutes = require("./routes/reviewRoutes");
 
 // Mount routes
-app.use('/api/notifications', notificationRoutes);
-app.use('/api/jobs', jobRoutes);
+app.use("/api/notifications", notificationRoutes);
+app.use("/api/jobs", jobRoutes);
+app.use("/api/reviews", reviewRoutes);
 
 // Define verifyUser middleware
 const verifyUser = async (req, res, next) => {
@@ -151,36 +154,41 @@ const verifyAdmin = async (req, res, next) => {
 };
 // Update user role (for both users and admins)
 // Profile update endpoint
-app.put("/api/users/profile", verifyUser, upload.single("profileImage"), async (req, res) => {
-  try {
-    const { firebaseUID } = req.user;
-    const { name, email, phone } = req.body;
-    
-    // Prepare update data
-    const updateData = { name, email, phone };
-    
-    // Handle profile image if uploaded
-    if (req.file) {
-      updateData.profilePicture = req.file.path;
+app.put(
+  "/api/users/profile",
+  verifyUser,
+  upload.single("profileImage"),
+  async (req, res) => {
+    try {
+      const { firebaseUID } = req.user;
+      const { name, email, phone } = req.body;
+
+      // Prepare update data
+      const updateData = { name, email, phone };
+
+      // Handle profile image if uploaded
+      if (req.file) {
+        updateData.profilePicture = req.file.path;
+      }
+
+      // Update user in database
+      const updatedUser = await User.findOneAndUpdate(
+        { firebaseUID },
+        updateData,
+        { new: true }
+      );
+
+      if (!updatedUser) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      res.status(200).json(updatedUser);
+    } catch (error) {
+      console.error("Profile update error:", error);
+      res.status(500).json({ error: "Failed to update profile" });
     }
-    
-    // Update user in database
-    const updatedUser = await User.findOneAndUpdate(
-      { firebaseUID },
-      updateData,
-      { new: true }
-    );
-    
-    if (!updatedUser) {
-      return res.status(404).json({ error: "User not found" });
-    }
-    
-    res.status(200).json(updatedUser);
-  } catch (error) {
-    console.error("Profile update error:", error);
-    res.status(500).json({ error: "Failed to update profile" });
   }
-});
+);
 
 app.patch("/api/users/:firebaseId/role", verifyUser, async (req, res) => {
   // Start a MongoDB session for transaction
@@ -219,7 +227,13 @@ app.patch("/api/users/:firebaseId/role", verifyUser, async (req, res) => {
     if (role === "worker") {
       await Worker.findOneAndUpdate(
         { firebaseUID: firebaseId },
-        { $setOnInsert: { firebaseUID: firebaseId, name: user.name, email: user.email } },
+        {
+          $setOnInsert: {
+            firebaseUID: firebaseId,
+            name: user.name,
+            email: user.email,
+          },
+        },
         { upsert: true, session }
       );
     } else if (user.role === "worker") {
@@ -230,7 +244,9 @@ app.patch("/api/users/:firebaseId/role", verifyUser, async (req, res) => {
     // Handle role change from client to worker
     if (role === "worker") {
       // Check if user exists in Client collection
-      const clientData = await Client.findOne({ firebaseUID: firebaseId }).lean();
+      const clientData = await Client.findOne({
+        firebaseUID: firebaseId,
+      }).lean();
 
       // Create worker document with data from user and client
       const workerData = {
@@ -274,10 +290,10 @@ app.patch("/api/users/:firebaseId/role", verifyUser, async (req, res) => {
       // Update user document with new role and worker-specific fields
       const updatedUser = await User.findOneAndUpdate(
         { firebaseUID: firebaseId },
-        { 
+        {
           role,
           categories: req.body.categories || [],
-          profilePicture: req.body.profilePicture || ""
+          profilePicture: req.body.profilePicture || "",
         },
         { new: true, session }
       );
@@ -288,7 +304,9 @@ app.patch("/api/users/:firebaseId/role", verifyUser, async (req, res) => {
     // Handle role change from worker to client
     else if (role === "client") {
       // Check if user exists in Worker collection
-      const workerData = await Worker.findOne({ firebaseUID: firebaseId }).lean();
+      const workerData = await Worker.findOne({
+        firebaseUID: firebaseId,
+      }).lean();
 
       // Create client document with data from user and worker
       const clientData = {
@@ -311,9 +329,9 @@ app.patch("/api/users/:firebaseId/role", verifyUser, async (req, res) => {
       // Update user document with new role and remove worker-specific fields
       const updatedUser = await User.findOneAndUpdate(
         { firebaseUID: firebaseId },
-        { 
+        {
           role,
-          $unset: { categories: "", profilePicture: "" }
+          $unset: { categories: "", profilePicture: "" },
         },
         { new: true, session }
       );
@@ -336,7 +354,7 @@ app.get("/api/users/me", verifyUser, async (req, res) => {
     if (!req.user?.firebaseUID) {
       return res.status(401).json({
         success: false,
-        error: "Authentication required"
+        error: "Authentication required",
       });
     }
 
@@ -349,20 +367,21 @@ app.get("/api/users/me", verifyUser, async (req, res) => {
       return res.status(404).json({
         success: false,
         error: "User not found",
-        action: "register"
+        action: "register",
       });
     }
 
     res.json({
       success: true,
-      data: user
+      data: user,
     });
   } catch (error) {
     console.error("Error fetching user:", error);
     res.status(500).json({
       success: false,
       error: "Internal server error",
-      details: process.env.NODE_ENV === "development" ? error.message : undefined
+      details:
+        process.env.NODE_ENV === "development" ? error.message : undefined,
     });
   }
 });
@@ -391,8 +410,8 @@ app.post("/api/users", async (req, res) => {
 
     const phone =
       req.body.phone && req.body.phone.trim() !== "" ? req.body.phone : "N/A";
-    const name = req.body.name || decodedToken.name || '';
-    const email = req.body.email || decodedToken.email || '';
+    const name = req.body.name || decodedToken.name || "";
+    const email = req.body.email || decodedToken.email || "";
     const role = req.body.role === "worker" ? "worker" : "client";
 
     // Create base user document
@@ -417,7 +436,7 @@ app.post("/api/users", async (req, res) => {
         newUser.categories = req.body.categories || [];
         newUser.profilePicture = req.body.profilePicture || "";
         newUser.rating = 0;
-        
+
         // Create worker document
         const newWorker = new Worker({
           firebaseUID,
@@ -427,7 +446,7 @@ app.post("/api/users", async (req, res) => {
           categories: req.body.categories || [],
           profilePicture: req.body.profilePicture || "",
           rating: 0,
-          jobsCompleted: 0
+          jobsCompleted: 0,
         });
         await newWorker.save({ session });
       } else {
@@ -437,7 +456,7 @@ app.post("/api/users", async (req, res) => {
           name,
           phone,
           email,
-          jobsRequested: 0
+          jobsRequested: 0,
         });
         await newClient.save({ session });
       }
@@ -474,29 +493,32 @@ app.get("/api/users/:id", async (req, res) => {
 app.get("/api/users/me", verifyUser, async (req, res) => {
   try {
     if (!req.user?.firebaseUID) {
-      console.log('No firebaseUID in request');
+      console.log("No firebaseUID in request");
       return res.status(401).json({
         success: false,
-        error: "Authentication required"
+        error: "Authentication required",
       });
     }
 
-    console.log('Fetching user with firebaseUID:', req.user.firebaseUID);
+    console.log("Fetching user with firebaseUID:", req.user.firebaseUID);
     const user = await User.findOne(
       { firebaseUID: req.user.firebaseUID },
       { _id: 1, name: 1, email: 1, role: 1, firebaseUID: 1 }
     ).lean();
 
     if (!user) {
-      console.log('User not found in database');
+      console.log("User not found in database");
       return res.status(404).json({
         success: false,
         error: "User not found",
-        action: "register"
+        action: "register",
       });
     }
 
-    console.log('User found:', { role: user.role, firebaseUID: user.firebaseUID });
+    console.log("User found:", {
+      role: user.role,
+      firebaseUID: user.firebaseUID,
+    });
     res.json({
       success: true,
       data: {
@@ -504,15 +526,16 @@ app.get("/api/users/me", verifyUser, async (req, res) => {
         name: user.name,
         email: user.email,
         role: user.role,
-        firebaseUID: user.firebaseUID
-      }
+        firebaseUID: user.firebaseUID,
+      },
     });
   } catch (error) {
     console.error("Error in /api/users/me:", error);
     res.status(500).json({
       success: false,
       error: "Internal server error",
-      details: process.env.NODE_ENV === "development" ? error.message : undefined
+      details:
+        process.env.NODE_ENV === "development" ? error.message : undefined,
     });
   }
 });
@@ -606,105 +629,154 @@ app.post(
   }
 );
 // Worker Registration Endpoint
-app.post("/api/workers/register", verifyUser, upload.single("profileImage"), async (req, res) => {
-  // Start a MongoDB session for transaction
-  const session = await mongoose.startSession();
-  session.startTransaction();
+app.post(
+  "/api/workers/register",
+  verifyUser,
+  upload.single("profileImage"),
+  async (req, res) => {
+    // Start a MongoDB session for transaction
+    const session = await mongoose.startSession();
+    session.startTransaction();
 
-  try {
-    // Validate required fields
-    const { phone, nationality, residence, category } = req.body;
-    if (!phone || !nationality || !residence || !category) {
-      return res.status(400).json({ message: "Please fill in all required fields" });
-    }
+    try {
+      // Validate required fields
+      const { phone, nationality, residence, category } = req.body;
+      if (!phone || !nationality || !residence || !category) {
+        return res
+          .status(400)
+          .json({ message: "Please fill in all required fields" });
+      }
 
-    const firebaseUID = req.user.firebaseUID;
+      const firebaseUID = req.user.firebaseUID;
 
-    // Find user by firebaseUID
-    const user = await User.findOne({ firebaseUID });
-    
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
-    }
+      // Find user by firebaseUID
+      const user = await User.findOne({ firebaseUID });
 
-    // Check if user is already a worker
-    if (user.role === "worker") {
-      return res.status(400).json({ message: "User is already registered as a worker" });
-    }
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
 
-    // Check if user exists in Client collection
-    const clientData = await Client.findOne({ firebaseUID }).lean();
+      // Check if user is already a worker
+      if (user.role === "worker") {
+        return res
+          .status(400)
+          .json({ message: "User is already registered as a worker" });
+      }
 
-    // Create worker document with data from user and form
-    const workerData = {
-      firebaseUID: user.firebaseUID,
-      name: user.name,
-      email: user.email,
-      phone,
-      categories: [category], // Store as array since WorkerModel expects an array
-      profileImage: req.file ? req.file.path : "",
-      rating: 0,
-      completedJobs: 0,
-      title: "",
-      bio: "",
-      availability: {
-        days: {
-          monday: false,
-          tuesday: false,
-          wednesday: false,
-          thursday: false,
-          friday: false,
-          saturday: false,
-          sunday: false,
+      // Check if user exists in Client collection
+      const clientData = await Client.findOne({ firebaseUID }).lean();
+
+      // Create worker document with data from user and form
+      const workerData = {
+        firebaseUID: user.firebaseUID,
+        name: user.name,
+        email: user.email,
+        phone,
+        categories: [category], // Store as array since WorkerModel expects an array
+        profileImage: req.file ? req.file.path : "",
+        rating: 0,
+        completedJobs: 0,
+        title: "",
+        bio: "",
+        availability: {
+          days: {
+            monday: false,
+            tuesday: false,
+            wednesday: false,
+            thursday: false,
+            friday: false,
+            saturday: false,
+            sunday: false,
+          },
+          hours: {
+            start: "09:00",
+            end: "17:00",
+          },
         },
-        hours: {
-          start: "09:00",
-          end: "17:00",
-        },
-      },
-    };
+      };
 
-    // Create new worker document
-    const newWorker = new Worker(workerData);
-    await newWorker.save({ session });
+      // Create new worker document
+      const newWorker = new Worker(workerData);
+      await newWorker.save({ session });
 
-    // Delete client document if it exists
-    if (clientData) {
-      await Client.findOneAndDelete({ firebaseUID }, { session });
+      // Delete client document if it exists
+      if (clientData) {
+        await Client.findOneAndDelete({ firebaseUID }, { session });
+      }
+
+      // Update user document with new role and worker-specific fields
+      user.role = "worker";
+      user.categories = [category];
+      if (req.file) {
+        user.profilePicture = req.file.path;
+      }
+      await user.save({ session });
+
+      await session.commitTransaction();
+      res.status(201).json({
+        message: "Successfully registered as a worker",
+        user: user,
+      });
+    } catch (error) {
+      await session.abortTransaction();
+      console.error("Error registering worker:", error);
+      res.status(500).json({ message: "Failed to register as worker" });
+    } finally {
+      session.endSession();
     }
-
-    // Update user document with new role and worker-specific fields
-    user.role = 'worker';
-    user.categories = [category];
-    if (req.file) {
-      user.profilePicture = req.file.path;
-    }
-    await user.save({ session });
-
-    await session.commitTransaction();
-    res.status(201).json({
-      message: "Successfully registered as a worker",
-      user: user
-    });
-  } catch (error) {
-    await session.abortTransaction();
-    console.error("Error registering worker:", error);
-    res.status(500).json({ message: "Failed to register as worker" });
-  } finally {
-    session.endSession();
   }
-});
+);
 
 // Get all workers
 app.get("/api/workers", async (req, res) => {
   try {
     const workers = await Worker.find({ role: "worker" })
-      .select("name email phone profilePicture rating categories firebaseUID createdAt")
+      .select(
+        "name email phone profilePicture rating categories firebaseUID createdAt"
+      )
       .populate("categories", "name description thumbnail")
       .lean();
 
-    console.log('Found workers:', workers); // Debug log
-    res.json(workers);
+    // Get all reviews for these workers
+    const workerIds = workers.map((worker) => worker._id);
+    const reviews = await Review.find({ worker: { $in: workerIds } })
+      .populate("client", "name")
+      .lean();
+
+    // Group reviews by worker
+    const reviewsByWorker = reviews.reduce((acc, review) => {
+      if (!acc[review.worker]) {
+        acc[review.worker] = [];
+      }
+      acc[review.worker].push(review);
+      return acc;
+    }, {});
+
+    // Transform the workers data to include review statistics
+    const workersWithReviews = workers.map((worker) => {
+      const workerReviews = reviewsByWorker[worker._id] || [];
+      const totalRatings = workerReviews.length;
+      const averageRating =
+        totalRatings > 0
+          ? workerReviews.reduce((sum, review) => sum + review.rating, 0) /
+            totalRatings
+          : 0;
+
+      return {
+        ...worker,
+        rating: averageRating,
+        reviewCount: totalRatings,
+        reviews: workerReviews.map((review) => ({
+          rating: review.rating,
+          comment: review.comment,
+          clientName: review.client?.name || "Anonymous",
+          date: new Date(review.createdAt).toLocaleDateString(),
+        })),
+      };
+    });
+
+    console.log("Found workers:", workersWithReviews); // Debug log
+    res.json(workersWithReviews);
   } catch (error) {
     console.error("Error fetching workers:", error);
     res.status(500).json({ error: "Failed to fetch workers" });
@@ -736,7 +808,7 @@ app.get("/api/workers/details/:workerId", async (req, res) => {
       .populate("categories", "name description")
       .lean()
       .catch(() => null); // Catch invalid ObjectId errors
-    
+
     // If not found by _id, try to find by firebaseUID
     if (!worker) {
       worker = await Worker.findOne({ firebaseUID: req.params.workerId })
@@ -749,13 +821,13 @@ app.get("/api/workers/details/:workerId", async (req, res) => {
       worker = await User.findOne({
         $or: [
           { _id: req.params.workerId },
-          { firebaseUID: req.params.workerId }
+          { firebaseUID: req.params.workerId },
         ],
-        role: "worker"
+        role: "worker",
       })
-      .select("name email phone profilePicture rating categories firebaseUID")
-      .populate("categories", "name description")
-      .lean();
+        .select("name email phone profilePicture rating categories firebaseUID")
+        .populate("categories", "name description")
+        .lean();
     }
 
     if (!worker) {

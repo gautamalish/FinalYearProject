@@ -6,7 +6,6 @@ import SignUp from "./pages/SignUp";
 import ErrorPage from "./pages/ErrorPage";
 import HiringPage from "./pages/HiringPage";
 import HiringForm from "./pages/HiringForm";
-import WorkerProfilePage from "./pages/WorkerProfilePage";
 import ServicesPage from "./pages/ServicesPage";
 import AdminDashboard from "./pages/AdminDashboard";
 import ProfessionalsPage from "./pages/ProfessionalsPage";
@@ -22,8 +21,9 @@ import { NotificationProvider } from "./contexts/NotificationContext";
 // and can safely use the useLocation hook
 const HeaderWithConditionalRendering = () => {
   const location = useLocation();
-  const isAuthPage = location.pathname === '/signin' || location.pathname === '/signup';
-  
+  const isAuthPage =
+    location.pathname === "/signin" || location.pathname === "/signup";
+
   // Only render the Header when not on auth pages
   return !isAuthPage ? <Header /> : null;
 };
@@ -43,9 +43,11 @@ function App() {
             <Route path="/services/:category" element={<ServicesPage />} />
             <Route path="/hiring" element={<HiringForm />} />
             <Route path="/hiring-page" element={<HiringPage />} />
-            <Route path="/worker/profile" element={<WorkerProfilePage />} />
             <Route path="/professionals" element={<ProfessionalsPage />} />
-            <Route path="/worker-registration" element={<WorkerRegistration />} />
+            <Route
+              path="/worker-registration"
+              element={<WorkerRegistration />}
+            />
             <Route path="/profile" element={<Profile />} />
             <Route path="/job-details/:jobId" element={<JobDetails />} />
             <Route path="/dashboard" element={<ClientDashboard />} />
