@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { FaUser, FaEnvelope, FaPhone, FaCamera } from 'react-icons/fa';
 import axios from 'axios';
+import './Profile.css';
 
 const Profile = () => {
   const { currentUser, mongoUser } = useAuth();
@@ -62,45 +63,55 @@ const Profile = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md mx-auto bg-white rounded-xl shadow-md overflow-hidden p-8">
-        <div className="text-center mb-8">
-          <h1 className="text-2xl font-bold text-gray-800">Your Profile</h1>
-          <p className="mt-2 text-gray-600">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 py-12 px-4 sm:px-6 lg:px-8 transition-all duration-300">
+      <div className="max-w-md mx-auto backdrop-blur-lg bg-white/80 rounded-2xl shadow-xl overflow-hidden p-8 transform hover:scale-[1.01] transition-all duration-300">
+        <div className="text-center mb-8 animate-fadeIn">
+          <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">Your Profile</h1>
+          <p className="mt-2 text-gray-600 animate-slideUp">
             View and manage your personal information
           </p>
         </div>
 
         {error && (
-          <div className="mb-4 p-3 bg-red-50 text-red-600 rounded-lg text-sm">
+          <div className="mb-4 p-4 bg-red-50 text-red-600 rounded-lg text-sm animate-slideUp flex items-center shadow-sm">
+            <div className="flex-shrink-0 mr-2">
+              <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+              </svg>
+            </div>
             {error}
           </div>
         )}
 
         {success && (
-          <div className="mb-4 p-3 bg-green-50 text-green-600 rounded-lg text-sm">
+          <div className="mb-4 p-4 bg-green-50 text-green-600 rounded-lg text-sm animate-slideUp flex items-center shadow-sm">
+            <div className="flex-shrink-0 mr-2">
+              <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+              </svg>
+            </div>
             {success}
           </div>
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* Profile Picture */}
-          <div className="flex justify-center mb-6">
-            <div className="relative">
-              <div className="h-24 w-24 rounded-full bg-gradient-to-r from-blue-500 to-indigo-600 flex items-center justify-center">
+          <div className="flex justify-center mb-6 animate-fadeIn">
+            <div className="relative group">
+              <div className="h-28 w-28 rounded-full bg-gradient-to-r from-blue-500 to-indigo-600 flex items-center justify-center transform group-hover:scale-105 transition-all duration-300 ring-4 ring-white shadow-xl">
                 {mongoUser?.profilePicture ? (
                   <img
                     src={mongoUser.profilePicture}
                     alt="Profile"
-                    className="h-24 w-24 rounded-full object-cover"
+                    className="h-28 w-28 rounded-full object-cover"
                   />
                 ) : (
-                  <FaUser className="text-white text-4xl" />
+                  <FaUser className="text-white text-5xl" />
                 )}
               </div>
               {isEditing && (
-                <label className="absolute bottom-0 right-0 bg-white rounded-full p-2 shadow-lg cursor-pointer hover:bg-gray-50 transition-colors">
-                  <FaCamera className="text-gray-600" />
+                <label className="absolute bottom-0 right-0 bg-white rounded-full p-3 shadow-lg cursor-pointer hover:bg-blue-50 transform hover:scale-110 transition-all duration-300">
+                  <FaCamera className="text-blue-600" />
                   <input
                     type="file"
                     name="profileImage"
@@ -123,7 +134,7 @@ const Profile = () => {
                 type="text"
                 name="name"
                 placeholder="Full Name"
-                className={`pl-10 w-full px-3 py-2 border ${isEditing ? 'border-blue-300' : 'border-gray-300'} rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${!isEditing && 'bg-gray-50'}`}
+                className={`pl-10 w-full px-3 py-3 border ${isEditing ? 'border-blue-300 ring-2 ring-blue-100' : 'border-gray-300'} rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${!isEditing && 'bg-gray-50'} transform transition-all duration-300 hover:shadow-sm`}
                 value={formData.name}
                 onChange={handleInputChange}
                 disabled={!isEditing}
@@ -139,7 +150,7 @@ const Profile = () => {
                 type="email"
                 name="email"
                 placeholder="Email Address"
-                className="pl-10 w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50"
+                className="pl-10 w-full px-3 py-3 border border-gray-300 rounded-lg bg-gray-50 transform transition-all duration-300"
                 value={formData.email}
                 disabled
               />
@@ -153,7 +164,7 @@ const Profile = () => {
                 type="tel"
                 name="phone"
                 placeholder="Phone Number"
-                className={`pl-10 w-full px-3 py-2 border ${isEditing ? 'border-blue-300' : 'border-gray-300'} rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${!isEditing && 'bg-gray-50'}`}
+                className={`pl-10 w-full px-3 py-3 border ${isEditing ? 'border-blue-300 ring-2 ring-blue-100' : 'border-gray-300'} rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${!isEditing && 'bg-gray-50'} transform transition-all duration-300 hover:shadow-sm`}
                 value={formData.phone}
                 onChange={handleInputChange}
                 disabled={!isEditing}
@@ -169,14 +180,14 @@ const Profile = () => {
                 <button
                   type="button"
                   onClick={() => setIsEditing(false)}
-                  className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 border border-gray-300 rounded-lg transition-colors"
+                  className="px-6 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 border border-gray-300 rounded-lg transition-all duration-300 hover:shadow-md transform hover:scale-105"
                   disabled={isLoading}
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors flex items-center"
+                  className="px-6 py-2.5 text-sm font-medium text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 rounded-lg transition-all duration-300 hover:shadow-md transform hover:scale-105 flex items-center"
                   disabled={isLoading}
                 >
                   {isLoading ? (
@@ -193,7 +204,7 @@ const Profile = () => {
               <button
                 type="button"
                 onClick={() => setIsEditing(true)}
-                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
+                className="px-6 py-2.5 text-sm font-medium text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 rounded-lg transition-all duration-300 hover:shadow-md transform hover:scale-105"
               >
                 Edit Profile
               </button>

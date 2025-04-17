@@ -4,9 +4,8 @@ import Home from "./pages/Home";
 import SignIn from "./pages/SignIn";
 import SignUp from "./pages/SignUp";
 import ErrorPage from "./pages/ErrorPage";
-import MapComponent from "./components/location/Maps";
-import WorkerList from "./pages/WorkerList";
 import HiringPage from "./pages/HiringPage";
+import HiringForm from "./pages/HiringForm";
 import WorkerProfilePage from "./pages/WorkerProfilePage";
 import ServicesPage from "./pages/ServicesPage";
 import AdminDashboard from "./pages/AdminDashboard";
@@ -15,6 +14,9 @@ import ProtectedAdminRoute from "./components/ProtectedAdmin";
 import Header from "./components/home/Header";
 import WorkerRegistration from "./pages/WorkerRegistration";
 import Profile from "./pages/Profile";
+import JobDetails from "./pages/JobDetails";
+import ClientDashboard from "./pages/ClientDashboard";
+import { NotificationProvider } from "./contexts/NotificationContext";
 
 // This component will be rendered inside BrowserRouter
 // and can safely use the useLocation hook
@@ -30,29 +32,33 @@ function App() {
   return (
     <main>
       <BrowserRouter>
-        <HeaderWithConditionalRendering />
-        <Routes>
-          <Route path="/" element={<Home />} />
-          <Route path="/signin" element={<SignIn />} />
-          <Route path="/error" element={<ErrorPage />} />
-          <Route path="/signup" element={<SignUp />} />
-          <Route path="/location" element={<MapComponent />} />
-          <Route path="/services" element={<ServicesPage />} />
-          <Route path="/services/:categoryName" element={<WorkerList />} />
-          <Route path="/hiring" element={<HiringPage />} />
-          <Route path="/worker/profile" element={<WorkerProfilePage />} />
-          <Route path="/professionals" element={<ProfessionalsPage />} />
-          <Route path="/worker-registration" element={<WorkerRegistration />} />
-          <Route path="/profile" element={<Profile />} />
-          <Route
-            path="/admin"
-            element={
-              <ProtectedAdminRoute>
-                <AdminDashboard />
-              </ProtectedAdminRoute>
-            }
-          />
-        </Routes>
+        <NotificationProvider>
+          <HeaderWithConditionalRendering />
+          <Routes>
+            <Route path="/" element={<Home />} />
+            <Route path="/signin" element={<SignIn />} />
+            <Route path="/error" element={<ErrorPage />} />
+            <Route path="/signup" element={<SignUp />} />
+            <Route path="/services" element={<ServicesPage />} />
+            <Route path="/services/:category" element={<ServicesPage />} />
+            <Route path="/hiring" element={<HiringForm />} />
+            <Route path="/hiring-page" element={<HiringPage />} />
+            <Route path="/worker/profile" element={<WorkerProfilePage />} />
+            <Route path="/professionals" element={<ProfessionalsPage />} />
+            <Route path="/worker-registration" element={<WorkerRegistration />} />
+            <Route path="/profile" element={<Profile />} />
+            <Route path="/job-details/:jobId" element={<JobDetails />} />
+            <Route path="/dashboard" element={<ClientDashboard />} />
+            <Route
+              path="/admin"
+              element={
+                <ProtectedAdminRoute>
+                  <AdminDashboard />
+                </ProtectedAdminRoute>
+              }
+            />
+          </Routes>
+        </NotificationProvider>
       </BrowserRouter>
     </main>
   );

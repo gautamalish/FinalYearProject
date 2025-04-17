@@ -37,6 +37,16 @@ admin.initializeApp({
 
 // Connect to MongoDB
 connectDB();
+
+// Import routes
+const notificationRoutes = require('./routes/notificationRoutes');
+const jobRoutes = require('./routes/jobRoutes');
+
+// Mount routes
+app.use('/api/notifications', notificationRoutes);
+app.use('/api/jobs', jobRoutes);
+
+// Define verifyUser middleware
 const verifyUser = async (req, res, next) => {
   if (req.method === "OPTIONS") return next();
 
@@ -602,19 +612,24 @@ app.post("/api/workers/register", verifyUser, upload.single("profileImage"), asy
   session.startTransaction();
 
   try {
+    // Validate required fields
     const { phone, nationality, residence, category } = req.body;
+    if (!phone || !nationality || !residence || !category) {
+      return res.status(400).json({ message: "Please fill in all required fields" });
+    }
+
     const firebaseUID = req.user.firebaseUID;
 
     // Find user by firebaseUID
-    const user = await User.findOne({ firebaseUID }).session(session);
-
+    const user = await User.findOne({ firebaseUID });
+    
     if (!user) {
-      return res.status(404).json({ error: "User not found" });
+      return res.status(404).json({ message: "User not found" });
     }
 
     // Check if user is already a worker
     if (user.role === "worker") {
-      return res.status(400).json({ error: "User is already registered as a worker" });
+      return res.status(400).json({ message: "User is already registered as a worker" });
     }
 
     // Check if user exists in Client collection
@@ -625,12 +640,11 @@ app.post("/api/workers/register", verifyUser, upload.single("profileImage"), asy
       firebaseUID: user.firebaseUID,
       name: user.name,
       email: user.email,
-      phone: phone || "",
-      categories: category ? [category] : [],
+      phone,
+      categories: [category], // Store as array since WorkerModel expects an array
       profileImage: req.file ? req.file.path : "",
       rating: 0,
       completedJobs: 0,
-      // Add other worker-specific fields with defaults
       title: "",
       bio: "",
       availability: {
@@ -660,22 +674,22 @@ app.post("/api/workers/register", verifyUser, upload.single("profileImage"), asy
     }
 
     // Update user document with new role and worker-specific fields
-    const updatedUser = await User.findOneAndUpdate(
-      { firebaseUID },
-      { 
-        role: "worker",
-        categories: category ? [category] : [],
-        profilePicture: req.file ? req.file.path : ""
-      },
-      { new: true, session }
-    );
+    user.role = 'worker';
+    user.categories = [category];
+    if (req.file) {
+      user.profilePicture = req.file.path;
+    }
+    await user.save({ session });
 
     await session.commitTransaction();
-    res.status(201).json(updatedUser);
+    res.status(201).json({
+      message: "Successfully registered as a worker",
+      user: user
+    });
   } catch (error) {
     await session.abortTransaction();
     console.error("Error registering worker:", error);
-    res.status(500).json({ error: "Failed to register as worker" });
+    res.status(500).json({ message: "Failed to register as worker" });
   } finally {
     session.endSession();
   }
@@ -684,7 +698,7 @@ app.post("/api/workers/register", verifyUser, upload.single("profileImage"), asy
 // Get all workers
 app.get("/api/workers", async (req, res) => {
   try {
-    const workers = await User.find({ role: "worker" })
+    const workers = await Worker.find({ role: "worker" })
       .select("name email phone profilePicture rating categories firebaseUID createdAt")
       .populate("categories", "name description thumbnail")
       .lean();
@@ -700,11 +714,10 @@ app.get("/api/workers", async (req, res) => {
 // Get workers by category
 app.get("/api/workers/:categoryId", async (req, res) => {
   try {
-    const workers = await User.find({
-      role: "worker",
+    const workers = await Worker.find({
       categories: req.params.categoryId,
     })
-      .select("name email phone profilePicture rating")
+      .select("name email phone profileImage rating availability")
       .lean();
 
     // Ensure we always return an array
@@ -712,6 +725,47 @@ app.get("/api/workers/:categoryId", async (req, res) => {
   } catch (error) {
     console.error("Error fetching workers:", error);
     res.status(500).json([]); // Return empty array on error
+  }
+});
+
+// Get worker details by ID
+app.get("/api/workers/details/:workerId", async (req, res) => {
+  try {
+    // First try to find worker by MongoDB _id
+    let worker = await Worker.findById(req.params.workerId)
+      .populate("categories", "name description")
+      .lean()
+      .catch(() => null); // Catch invalid ObjectId errors
+    
+    // If not found by _id, try to find by firebaseUID
+    if (!worker) {
+      worker = await Worker.findOne({ firebaseUID: req.params.workerId })
+        .populate("categories", "name description")
+        .lean();
+    }
+
+    // If still not found, try User model (some workers might only exist in User model)
+    if (!worker) {
+      worker = await User.findOne({
+        $or: [
+          { _id: req.params.workerId },
+          { firebaseUID: req.params.workerId }
+        ],
+        role: "worker"
+      })
+      .select("name email phone profilePicture rating categories firebaseUID")
+      .populate("categories", "name description")
+      .lean();
+    }
+
+    if (!worker) {
+      return res.status(404).json({ error: "Worker not found" });
+    }
+
+    res.json(worker);
+  } catch (error) {
+    console.error("Error fetching worker details:", error);
+    res.status(500).json({ error: "Failed to fetch worker details" });
   }
 });
 

@@ -79,7 +79,7 @@ const handleSubmit = async (e) => {
         },
       });
 
-      navigate("/dashboard");
+      navigate("/");
     } catch (err) {
       setError(
         err.response?.data?.message || "Registration failed. Please try again."

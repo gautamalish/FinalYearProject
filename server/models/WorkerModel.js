@@ -5,6 +5,7 @@ const workerSchema = new Schema({
   firebaseUID: { type: String, required: true, unique: true },
   name: { type: String, required: true },
   email: { type: String, required: true },
+  role: { type: String, default: "worker" },
   title: { type: String },
   bio: { type: String },
   phone: { type: String },

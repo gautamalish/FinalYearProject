@@ -1,9 +1,14 @@
 const mongoose = require("mongoose");
 const jobSchema = new mongoose.Schema({
-  title: String,
-  description: String,
-  price: Number,
-  serviceFee: Number,
+  title: { type: String, required: true },
+  description: { type: String, required: true },
+  location: { type: String, required: true },
+  date: { type: String, required: true },
+  time: { type: String, required: true },
+  clientName: { type: String, required: true },
+  clientPhone: { type: String, required: true },
+  price: { type: Number, default: 0 },
+  serviceFee: { type: Number, default: 0 },
   status: {
     type: String,
     enum: ["pending", "accepted", "in_progress", "completed", "cancelled"],
@@ -14,9 +19,10 @@ const jobSchema = new mongoose.Schema({
     enum: ["pending", "paid", "refunded"],
     default: "pending",
   },
-  worker: { type: mongoose.Schema.Types.ObjectId, ref: "Worker" },
-  client: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+  worker: { type: mongoose.Schema.Types.ObjectId, ref: "Worker", required: true },
+  client: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
   completedAt: Date,
+  createdAt: { type: Date, default: Date.now }
 });
 
 module.exports = mongoose.model("Job", jobSchema);

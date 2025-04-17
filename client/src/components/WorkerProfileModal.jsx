@@ -1,12 +1,20 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { FaTimes, FaStar, FaMapMarkerAlt, FaPhone, FaEnvelope, FaCalendarAlt } from 'react-icons/fa';
 
 const WorkerProfileModal = ({ worker, isOpen, onClose }) => {
+  const navigate = useNavigate();
+  
   if (!isOpen || !worker) return null;
 
   // Prevent clicks inside the modal from closing it
   const handleModalClick = (e) => {
     e.stopPropagation();
+  };
+  
+  // Handle hiring the worker
+  const handleHireWorker = () => {
+    navigate(`/hiring?workerId=${worker._id || worker.id}`);
   };
 
   return (
@@ -169,7 +177,7 @@ const WorkerProfileModal = ({ worker, isOpen, onClose }) => {
           </button>
           <button 
             className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-            onClick={() => window.location.href = `/hiring?workerId=${worker._id || worker.id}`}
+            onClick={handleHireWorker}
           >
             Hire Now
           </button>
