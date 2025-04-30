@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import axios from 'axios';
 import { FaMapMarkerAlt, FaCalendarAlt, FaClock, FaUser, FaPhone, FaCheckCircle, FaTimesCircle, FaStar } from 'react-icons/fa';
+import KhaltiPaymentButton from '../components/KhaltiPaymentButton';
 
 const JobDetails = () => {
   const { jobId } = useParams();
@@ -15,6 +16,7 @@ const JobDetails = () => {
   const [review, setReview] = useState({ rating: 5, comment: '' });
   const [isSubmittingReview, setIsSubmittingReview] = useState(false);
   const [reviewError, setReviewError] = useState('');
+  const [paymentSuccess, setPaymentSuccess] = useState(false);
 
   useEffect(() => {
     const fetchJobDetails = async () => {
@@ -118,6 +120,15 @@ const JobDetails = () => {
   const formatDate = (dateString) => {
     const options = { year: 'numeric', month: 'long', day: 'numeric' };
     return new Date(dateString).toLocaleDateString(undefined, options);
+  };
+
+  // Handle successful payment
+  const handlePaymentSuccess = (result) => {
+    setPaymentSuccess(true);
+    // Update job data to reflect payment
+    setJob(prev => ({ ...prev, paymentStatus: 'paid' }));
+    // Show success message for 3 seconds
+    setTimeout(() => setPaymentSuccess(false), 3000);
   };
 
   return (
@@ -253,6 +264,27 @@ const JobDetails = () => {
             </div>
           )}
           
+          {/* Payment Section - Only show for clients when job is completed and payment is pending */}
+          {mongoUser?.role === 'client' && job.status === 'completed' && job.paymentStatus === 'pending' && (
+            <div className="border-t pt-6 mb-8">
+              <h2 className="text-lg font-semibold text-gray-800 mb-4">Payment</h2>
+              
+              {paymentSuccess && (
+                <div className="mb-4 p-3 bg-green-50 text-green-600 rounded-lg flex items-center">
+                  <FaCheckCircle className="mr-2" />
+                  <span>Payment successful! Thank you for your payment.</span>
+                </div>
+              )}
+
+              <div className="bg-gray-50 p-4 rounded-lg mb-4">
+                <p className="text-sm text-gray-600 mb-2">Please complete the payment to finalize this job.</p>
+                <p className="text-sm text-gray-600">A 10% service fee will be added to the total amount.</p>
+              </div>
+
+              <KhaltiPaymentButton job={job} onPaymentSuccess={handlePaymentSuccess} />
+            </div>
+          )}
+
           {/* Review Section - Only show for clients when job is completed */}
           {mongoUser?.role === 'client' && job.status === 'completed' && (
             <div className="border-t pt-6 mb-8">

@@ -38,6 +38,34 @@ export function AuthProvider({ children }) {
       );
       
       if (response.data) {
+        // If user is a worker, fetch worker data to get hourlyRate
+        if (response.data.role === 'worker') {
+          try {
+            const workerResponse = await axios.get(
+              `http://localhost:3000/api/workers/${firebaseUser.uid}`,
+              {
+                headers: { 
+                  Authorization: `Bearer ${token}`,
+                  'Content-Type': 'application/json'
+                },
+              }
+            );
+            
+            if (workerResponse.data) {
+              // Combine user data with worker data
+              const combinedData = {
+                ...response.data,
+                hourlyRate: workerResponse.data.hourlyRate
+              };
+              setMongoUser(combinedData);
+              return combinedData;
+            }
+          } catch (workerError) {
+            console.error("Error fetching worker data:", workerError.response || workerError);
+            // Continue with just the user data if worker data fetch fails
+          }
+        }
+        
         setMongoUser(response.data);
         return response.data;
       }

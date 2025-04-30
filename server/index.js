@@ -43,11 +43,13 @@ connectDB();
 const notificationRoutes = require("./routes/notificationRoutes");
 const jobRoutes = require("./routes/jobRoutes");
 const reviewRoutes = require("./routes/reviewRoutes");
+const paymentRoutes = require("./routes/paymentRoutes");
 
 // Mount routes
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/jobs", jobRoutes);
 app.use("/api/reviews", reviewRoutes);
+app.use("/api/payments", paymentRoutes);
 
 // Define verifyUser middleware
 const verifyUser = async (req, res, next) => {
@@ -161,7 +163,9 @@ app.put(
   async (req, res) => {
     try {
       const { firebaseUID } = req.user;
-      const { name, email, phone } = req.body;
+      const { name, email, phone, hourlyRate } = req.body;
+
+      console.log("Profile update request:", { name, email, phone, hourlyRate });
 
       // Prepare update data
       const updateData = { name, email, phone };
@@ -171,21 +175,71 @@ app.put(
         updateData.profilePicture = req.file.path;
       }
 
-      // Update user in database
-      const updatedUser = await User.findOneAndUpdate(
-        { firebaseUID },
-        updateData,
-        { new: true }
-      );
+      // Start a MongoDB session for transaction
+      const session = await mongoose.startSession();
+      session.startTransaction();
 
-      if (!updatedUser) {
-        return res.status(404).json({ error: "User not found" });
+      try {
+        // Update user in database
+        const updatedUser = await User.findOneAndUpdate(
+          { firebaseUID },
+          updateData,
+          { new: true, session }
+        );
+
+        if (!updatedUser) {
+          throw new Error("User not found");
+        }
+
+        let workerData = null;
+        
+        // If user is a worker and hourlyRate is provided, update the Worker document
+        if (updatedUser.role === "worker" && hourlyRate !== undefined) {
+          // Ensure hourlyRate is a valid positive number
+          const parsedHourlyRate = parseFloat(hourlyRate);
+          if (isNaN(parsedHourlyRate) || parsedHourlyRate < 0) {
+            throw new Error("Hourly rate must be a valid positive number");
+          }
+
+          // Update hourly rate in Worker collection
+          workerData = await Worker.findOneAndUpdate(
+            { firebaseUID },
+            { hourlyRate: parsedHourlyRate },
+            { new: true, session }
+          );
+
+          if (!workerData) {
+            throw new Error("Worker data not found");
+          }
+
+          // Also update hourlyRate in User collection to keep them in sync
+          await User.findOneAndUpdate(
+            { firebaseUID },
+            { hourlyRate: parsedHourlyRate },
+            { session }
+          );
+
+          console.log("Updated worker hourly rate in both collections:", parsedHourlyRate);
+        }
+
+        await session.commitTransaction();
+
+        // Combine user and worker data for response
+        const responseData = {
+          ...updatedUser.toObject(),
+          hourlyRate: workerData?.hourlyRate
+        };
+
+        res.status(200).json(responseData);
+      } catch (error) {
+        await session.abortTransaction();
+        throw error;
+      } finally {
+        session.endSession();
       }
-
-      res.status(200).json(updatedUser);
     } catch (error) {
       console.error("Profile update error:", error);
-      res.status(500).json({ error: "Failed to update profile" });
+      res.status(400).json({ error: error.message || "Failed to update profile" });
     }
   }
 );
@@ -640,14 +694,20 @@ app.post(
 
     try {
       // Validate required fields
-      const { phone, nationality, residence, category } = req.body;
-      if (!phone || !nationality || !residence || !category) {
+      const { phone, nationality, residence, category, hourlyRate } = req.body;
+      if (!phone || !nationality || !residence || !category || !hourlyRate) {
         return res
           .status(400)
           .json({ message: "Please fill in all required fields" });
       }
 
       const firebaseUID = req.user.firebaseUID;
+
+      // Ensure hourlyRate is a valid positive number
+      const parsedHourlyRate = parseFloat(hourlyRate);
+      if (isNaN(parsedHourlyRate) || parsedHourlyRate < 0) {
+        return res.status(400).json({ message: "Hourly rate must be a valid positive number" });
+      }
 
       // Find user by firebaseUID
       const user = await User.findOne({ firebaseUID });
@@ -672,12 +732,13 @@ app.post(
         name: user.name,
         email: user.email,
         phone,
-        categories: [category], // Store as array since WorkerModel expects an array
+        nationality,
+        residence,
+        categories: [category], // Store as array since schema expects array
+        hourlyRate: parsedHourlyRate,
         profileImage: req.file ? req.file.path : "",
         rating: 0,
         completedJobs: 0,
-        title: "",
-        bio: "",
         availability: {
           days: {
             monday: false,
@@ -686,36 +747,35 @@ app.post(
             thursday: false,
             friday: false,
             saturday: false,
-            sunday: false,
+            sunday: false
           },
           hours: {
             start: "09:00",
-            end: "17:00",
-          },
-        },
+            end: "17:00"
+          }
+        }
       };
 
       // Create new worker document
       const newWorker = new Worker(workerData);
       await newWorker.save({ session });
 
+      // Update user role to worker and save hourly rate
+      await User.findOneAndUpdate(
+        { firebaseUID },
+        { role: "worker", hourlyRate: parsedHourlyRate },
+        { session }
+      );
+
       // Delete client document if it exists
       if (clientData) {
         await Client.findOneAndDelete({ firebaseUID }, { session });
       }
 
-      // Update user document with new role and worker-specific fields
-      user.role = "worker";
-      user.categories = [category];
-      if (req.file) {
-        user.profilePicture = req.file.path;
-      }
-      await user.save({ session });
-
       await session.commitTransaction();
       res.status(201).json({
-        message: "Successfully registered as a worker",
-        user: user,
+        message: "Successfully registered as worker",
+        worker: newWorker
       });
     } catch (error) {
       await session.abortTransaction();
@@ -732,7 +792,7 @@ app.get("/api/workers", async (req, res) => {
   try {
     const workers = await Worker.find({ role: "worker" })
       .select(
-        "name email phone profilePicture rating categories firebaseUID createdAt"
+        "name email phone profilePicture rating categories firebaseUID createdAt hourlyRate"
       )
       .populate("categories", "name description thumbnail")
       .lean();
@@ -784,7 +844,7 @@ app.get("/api/workers", async (req, res) => {
 });
 
 // Get workers by category
-app.get("/api/workers/:categoryId", async (req, res) => {
+app.get("/api/workers/category/:categoryId", async (req, res) => {
   try {
     const workers = await Worker.find({
       categories: req.params.categoryId,
@@ -797,6 +857,25 @@ app.get("/api/workers/:categoryId", async (req, res) => {
   } catch (error) {
     console.error("Error fetching workers:", error);
     res.status(500).json([]); // Return empty array on error
+  }
+});
+
+// Get worker by Firebase UID
+app.get("/api/workers/:firebaseUID", async (req, res) => {
+  try {
+    // Find worker by firebaseUID
+    const worker = await Worker.findOne({ firebaseUID: req.params.firebaseUID })
+      .populate("categories", "name description")
+      .lean();
+
+    if (!worker) {
+      return res.status(404).json({ error: "Worker not found" });
+    }
+
+    res.json(worker);
+  } catch (error) {
+    console.error("Error fetching worker by Firebase UID:", error);
+    res.status(500).json({ error: "Failed to fetch worker details" });
   }
 });
 
@@ -847,48 +926,46 @@ app.put(
   upload.single("thumbnail"),
   async (req, res) => {
     try {
-      const updateData = {
-        name: req.body.name,
-        description: req.body.description,
-      };
+      const { name, description } = req.body;
+      const categoryId = req.params.id;
 
-      // Only process thumbnail if file was uploaded
+      // Find the existing category
+      const category = await Category.findById(categoryId);
+      if (!category) {
+        return res.status(404).json({ error: "Category not found" });
+      }
+
+      // Prepare update data
+      const updateData = { name, description };
+
+      // Handle thumbnail upload if a new file is provided
       if (req.file) {
-        // Delete old thumbnail if exists
-        const oldCategory = await Category.findById(req.params.id);
-        if (oldCategory?.thumbnail?.publicId) {
-          await cloudinary.uploader
-            .destroy(oldCategory.thumbnail.publicId)
-            .catch((err) => console.error("Error deleting old image:", err));
+        // Delete old thumbnail from Cloudinary if it exists
+        if (category.thumbnail?.publicId) {
+          await cloudinary.uploader.destroy(category.thumbnail.publicId);
         }
 
+        // Add new thumbnail data
         updateData.thumbnail = {
           url: req.file.path,
           publicId: req.file.filename,
         };
       }
 
+      // Update the category
       const updatedCategory = await Category.findByIdAndUpdate(
-        req.params.id,
+        categoryId,
         updateData,
         { new: true }
       );
 
-      if (!updatedCategory) {
-        return res.status(404).json({ error: "Category not found" });
-      }
-
-      // Ensure consistent response format
-      res.json({
-        ...updatedCategory.toObject(),
-        thumbnail: updateData.thumbnail || updatedCategory.thumbnail,
-      });
-    } catch (err) {
-      console.error("Update error:", err);
-      res.status(400).json({
+      res.json(updatedCategory);
+    } catch (error) {
+      console.error("Error updating category:", error);
+      res.status(500).json({
         error: "Failed to update category",
         details:
-          process.env.NODE_ENV === "development" ? err.message : undefined,
+          process.env.NODE_ENV === "development" ? error.message : undefined,
       });
     }
   }

@@ -21,6 +21,10 @@ const userSchema = new mongoose.Schema({
     type: Number,
     default: 0,
   },
+  hourlyRate: {
+    type: Number,
+    min: 0,
+  },
   profilePicture: String,
   createdAt: { type: Date, default: Date.now },
 });

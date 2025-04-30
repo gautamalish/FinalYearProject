@@ -10,7 +10,7 @@ import {
   FaSave,
   FaTimes,
   FaSignOutAlt,
-  FaInfoCircle
+  FaInfoCircle,
 } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
@@ -44,12 +44,15 @@ const AdminDashboard = () => {
   });
 
   // Add Tailwind CSS classes for consistent styling
-  const tabButtonClasses = "px-4 py-2 text-sm font-medium rounded-lg transition-colors duration-200";
+  const tabButtonClasses =
+    "px-4 py-2 text-sm font-medium rounded-lg transition-colors duration-200";
   const activeTabClasses = "bg-blue-600 text-white hover:bg-blue-700";
   const inactiveTabClasses = "text-gray-600 hover:bg-gray-100";
   const cardClasses = "bg-white rounded-lg shadow-md p-6 mb-6";
-  const inputClasses = "w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500";
-  const buttonClasses = "px-4 py-2 rounded-lg font-medium transition-colors duration-200";
+  const inputClasses =
+    "w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500";
+  const buttonClasses =
+    "px-4 py-2 rounded-lg font-medium transition-colors duration-200";
 
   const navigate = useNavigate();
 
@@ -305,8 +308,12 @@ const AdminDashboard = () => {
         {/* Header */}
         <div className="flex justify-between items-center mb-8 bg-white rounded-xl shadow-sm p-6">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Admin Dashboard</h1>
-            <p className="text-gray-600 mt-1">Manage your platform's content and users</p>
+            <h1 className="text-3xl font-bold text-gray-900">
+              Admin Dashboard
+            </h1>
+            <p className="text-gray-600 mt-1">
+              Manage your platform's content and users
+            </p>
           </div>
           <button
             onClick={() => logOut()}
@@ -331,20 +338,26 @@ const AdminDashboard = () => {
         {/* Navigation Tabs */}
         <div className="flex space-x-4 mb-8 bg-white rounded-xl shadow-sm p-2">
           <button
-            className={`${tabButtonClasses} ${activeTab === 'categories' ? activeTabClasses : inactiveTabClasses} flex items-center gap-2`}
-            onClick={() => setActiveTab('categories')}
+            className={`${tabButtonClasses} ${
+              activeTab === "categories" ? activeTabClasses : inactiveTabClasses
+            } flex items-center gap-2`}
+            onClick={() => setActiveTab("categories")}
           >
             <FaBriefcase className="text-lg" /> Categories
           </button>
           <button
-            className={`${tabButtonClasses} ${activeTab === 'users' ? activeTabClasses : inactiveTabClasses} flex items-center gap-2`}
-            onClick={() => setActiveTab('users')}
+            className={`${tabButtonClasses} ${
+              activeTab === "users" ? activeTabClasses : inactiveTabClasses
+            } flex items-center gap-2`}
+            onClick={() => setActiveTab("users")}
           >
             <FaUsers className="text-lg" /> Users
           </button>
           <button
-            className={`${tabButtonClasses} ${activeTab === 'stats' ? activeTabClasses : inactiveTabClasses} flex items-center gap-2`}
-            onClick={() => setActiveTab('stats')}
+            className={`${tabButtonClasses} ${
+              activeTab === "stats" ? activeTabClasses : inactiveTabClasses
+            } flex items-center gap-2`}
+            onClick={() => setActiveTab("stats")}
           >
             <FaChartLine className="text-lg" /> Statistics
           </button>

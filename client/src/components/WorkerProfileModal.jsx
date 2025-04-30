@@ -7,6 +7,7 @@ import {
   FaPhone,
   FaEnvelope,
   FaCalendarAlt,
+  FaDollarSign,
 } from "react-icons/fa";
 import { useAuth } from "../contexts/AuthContext";
 import axios from "axios";
@@ -169,6 +170,15 @@ const WorkerProfileModal = ({ worker, isOpen, onClose }) => {
                 <p className="text-sm text-gray-500">Location</p>
                 <p className="font-medium">
                   {worker.location || "Not specified"}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center">
+              <FaDollarSign className="text-blue-600 mr-3" />
+              <div>
+                <p className="text-sm text-gray-500">Hourly Rate</p>
+                <p className="font-medium">
+                  {worker.hourlyRate ? `$${worker.hourlyRate}/hr` : "Not specified"}
                 </p>
               </div>
             </div>

@@ -20,6 +20,7 @@ const WorkerRegistration = () => {
     nationality: "",
     residence: "",
     category: "",
+    hourlyRate: "",
     profileImage: null,
   });
   
@@ -67,6 +68,7 @@ const handleSubmit = async (e) => {
     formDataToSend.append("nationality", formData.nationality);
     formDataToSend.append("residence", formData.residence);
     formDataToSend.append("category", formData.category);
+    formDataToSend.append("hourlyRate", formData.hourlyRate);
     if (formData.profileImage) {
       formDataToSend.append("profileImage", formData.profileImage);
     }
@@ -149,6 +151,23 @@ const handleSubmit = async (e) => {
               className="pl-10 w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               value={formData.residence}
               onChange={handleInputChange}
+              required
+            />
+          </div>
+
+          <div className="relative">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <FaList className="text-gray-400" />
+            </div>
+            <input
+              type="number"
+              name="hourlyRate"
+              placeholder="Hourly Rate (RM)"
+              className="pl-10 w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              value={formData.hourlyRate}
+              onChange={handleInputChange}
+              min="0"
+              step="0.01"
               required
             />
           </div>

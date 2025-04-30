@@ -98,7 +98,6 @@ export const fetchPopularCategories = async () => {
   }
 };
 export const createCategory = async (formData, token) => {
-  // Change parameter name to formData
   try {
     // Get the name from formData to validate
     const name = formData.get("name");
@@ -115,15 +114,12 @@ export const createCategory = async (formData, token) => {
 
     const response = await axios.post(
       `${API_URL}/categories`,
-      formData, // Send the FormData directly
+      formData,
       config
     );
     return response.data;
   } catch (error) {
-    const errorMsg =
-      error.response?.data?.message || "Failed to create category";
-    console.error("Category creation error:", errorMsg, error.response?.data);
-    throw new Error(errorMsg);
+    handleApiError(error);
   }
 };
 

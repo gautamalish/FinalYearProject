@@ -1,17 +1,18 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { FaUser, FaEnvelope, FaPhone, FaCamera } from 'react-icons/fa';
+import { FaUser, FaEnvelope, FaPhone, FaCamera, FaDollarSign } from 'react-icons/fa';
 import axios from 'axios';
 import './Profile.css';
 
 const Profile = () => {
-  const { currentUser, mongoUser } = useAuth();
+  const { currentUser, mongoUser, refreshToken } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState({
     name: mongoUser?.name || '',
     email: currentUser?.email || '',
     phone: mongoUser?.phone || '',
-    profileImage: null
+    profileImage: null,
+    hourlyRate: mongoUser?.hourlyRate || ''
   });
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -42,21 +43,39 @@ const Profile = () => {
       if (formData.profileImage) {
         formDataToSend.append('profileImage', formData.profileImage);
       }
+      if (mongoUser?.role === 'worker') {
+        formDataToSend.append('hourlyRate', formData.hourlyRate);
+      }
 
       const token = await currentUser.getIdToken();
-      await axios.put('/api/users/profile', formDataToSend, {
+      const response = await axios.put('/api/users/profile', formDataToSend, {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'multipart/form-data'
         }
       });
 
+      // Update local state with the response data
+      const updatedData = response.data;
+      
+      // Update the form data with the response
+      setFormData(prev => ({
+        ...prev,
+        name: updatedData.name || prev.name,
+        phone: updatedData.phone || prev.phone,
+        hourlyRate: updatedData.hourlyRate || prev.hourlyRate
+      }));
+
       setSuccess('Profile updated successfully!');
       setIsEditing(false);
-      // Refresh the page to update the user data
-      window.location.reload();
+      
+      // Instead of reloading the page, refresh the user data
+      if (currentUser) {
+        await refreshToken();
+      }
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to update profile');
+      console.error('Profile update error:', err);
+      setError(err.response?.data?.error || 'Failed to update profile');
     } finally {
       setIsLoading(false);
     }
@@ -122,7 +141,11 @@ const Profile = () => {
                 </label>
               )}
             </div>
+
+
           </div>
+
+
 
           {/* Form Fields */}
           <div className="space-y-4">
@@ -171,7 +194,32 @@ const Profile = () => {
                 required
               />
             </div>
+
+
           </div>
+
+
+
+          {/* Hourly Rate Field */}
+          {mongoUser?.role === 'worker' && (
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <FaDollarSign className="text-gray-400" />
+              </div>
+              <input
+                type="number"
+                name="hourlyRate"
+                placeholder="Hourly Rate (RM)"
+                className={`pl-10 w-full px-3 py-3 border ${isEditing ? 'border-blue-300 ring-2 ring-blue-100' : 'border-gray-300'} rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${!isEditing && 'bg-gray-50'} transform transition-all duration-300 hover:shadow-sm`}
+                value={formData.hourlyRate}
+                onChange={handleInputChange}
+                disabled={!isEditing}
+                min="0"
+                step="0.01"
+                required
+              />
+            </div>
+          )}
 
           {/* Action Buttons */}
           <div className="flex justify-end space-x-3 mt-6">

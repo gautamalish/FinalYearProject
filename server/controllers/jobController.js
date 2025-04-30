@@ -41,7 +41,7 @@ exports.createJob = async (req, res) => {
       return res.status(404).json({ message: 'Worker not found' });
     }
 
-    // Create the job
+    // Create the job with worker's hourly rate
     const job = new Job({
       title: `Service request from ${clientName}`,
       description,
@@ -53,7 +53,8 @@ exports.createJob = async (req, res) => {
       date,
       time,
       clientName,
-      clientPhone
+      clientPhone,
+      hourlyRate: worker.hourlyRate // Store worker's current rate
     });
 
     // Validate the job object against schema
@@ -168,6 +169,16 @@ exports.updateJobStatus = async (req, res) => {
     job.status = status;
     if (status === 'completed') {
       job.completedAt = new Date();
+      // Calculate duration in hours (assuming job starts when status changes to 'in_progress')
+      if (job.status === 'in_progress') {
+        const startTime = new Date(job.createdAt);
+        const endTime = new Date();
+        const durationHours = (endTime - startTime) / (1000 * 60 * 60); // Convert milliseconds to hours
+        job.duration = parseFloat(durationHours.toFixed(2));
+        job.totalAmount = job.hourlyRate * job.duration;
+      }
+      // When job is completed, payment is required
+      job.paymentStatus = 'pending';
     }
     
     await job.save();

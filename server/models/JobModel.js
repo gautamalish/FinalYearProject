@@ -7,7 +7,9 @@ const jobSchema = new mongoose.Schema({
   time: { type: String, required: true },
   clientName: { type: String, required: true },
   clientPhone: { type: String, required: true },
-  price: { type: Number, default: 0 },
+  hourlyRate: { type: Number, required: true }, // Worker's rate at time of job creation
+  duration: { type: Number }, // Duration in hours
+  totalAmount: { type: Number }, // Calculated based on hourlyRate * duration
   serviceFee: { type: Number, default: 0 },
   status: {
     type: String,

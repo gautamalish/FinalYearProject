@@ -2,15 +2,23 @@ import React, { useState, useEffect } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import axios from "axios";
 import WorkerProfileModal from "../components/WorkerProfileModal";
-import { FaEnvelope,FaPhone,FaStar } from "react-icons/fa";
+import { FaEnvelope, FaPhone, FaStar, FaDollarSign, FaFilter } from "react-icons/fa";
+import { Slider } from "@mui/material";
 
 const ProfessionalsPage = () => {
   const { currentUser } = useAuth();
   const [workers, setWorkers] = useState([]);
+  const [filteredWorkers, setFilteredWorkers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selectedWorker, setSelectedWorker] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [filters, setFilters] = useState({
+    minRating: 0,
+    maxHourlyRate: 200,
+    searchTerm: ""
+  });
+  const [showFilters, setShowFilters] = useState(false);
 
   useEffect(() => {
     const fetchWorkers = async () => {
@@ -21,7 +29,9 @@ const ProfessionalsPage = () => {
           : {};
 
         const response = await axios.get('/api/workers', config);
-        setWorkers(Array.isArray(response?.data) ? response.data : []);
+        const workersData = Array.isArray(response?.data) ? response.data : [];
+        setWorkers(workersData);
+        setFilteredWorkers(workersData);
       } catch (err) {
         console.error("Fetch workers error:", err);
         setError(err.response?.data?.message || "Failed to load professionals");
@@ -61,18 +71,96 @@ const ProfessionalsPage = () => {
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8 animate-fade-in">
-      <div className="text-center mb-12">
-        <h1 className="text-4xl md:text-5xl font-bold text-gray-800 mb-4">
-          All Service Professionals
-        </h1>
-        <p className="text-gray-600 text-lg max-w-2xl mx-auto">
-          Connect with skilled and trusted service providers in your area
-        </p>
+      <div className="mb-12">
+        <div className="text-center mb-8">
+          <h1 className="text-4xl md:text-5xl font-bold text-gray-800 mb-4">
+            All Service Professionals
+          </h1>
+          <p className="text-gray-600 text-lg max-w-2xl mx-auto">
+            Connect with skilled and trusted service providers in your area
+          </p>
+        </div>
+
+        <div className="max-w-4xl mx-auto mb-8">
+          <div className="flex items-center justify-between mb-4">
+            <input
+              type="text"
+              placeholder="Search professionals..."
+              className="w-full max-w-md px-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              value={filters.searchTerm}
+              onChange={(e) => {
+                setFilters({ ...filters, searchTerm: e.target.value });
+                const filtered = workers.filter(worker =>
+                  worker.name.toLowerCase().includes(e.target.value.toLowerCase()) &&
+                  worker.rating >= filters.minRating &&
+                  worker.hourlyRate <= filters.maxHourlyRate
+                );
+                setFilteredWorkers(filtered);
+              }}
+            />
+            <button
+              onClick={() => setShowFilters(!showFilters)}
+              className="ml-4 px-4 py-2 flex items-center text-gray-700 hover:text-blue-600 transition-colors"
+            >
+              <FaFilter className="mr-2" />
+              Filters
+            </button>
+          </div>
+
+          {showFilters && (
+            <div className="bg-white p-6 rounded-lg shadow-lg mb-6">
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Minimum Rating
+                </label>
+                <Slider
+                  value={filters.minRating}
+                  onChange={(_, newValue) => {
+                    setFilters({ ...filters, minRating: newValue });
+                    const filtered = workers.filter(worker =>
+                      worker.name.toLowerCase().includes(filters.searchTerm.toLowerCase()) &&
+                      worker.rating >= newValue &&
+                      worker.hourlyRate <= filters.maxHourlyRate
+                    );
+                    setFilteredWorkers(filtered);
+                  }}
+                  min={0}
+                  max={5}
+                  step={0.5}
+                  marks
+                  valueLabelDisplay="auto"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Maximum Hourly Rate ($)
+                </label>
+                <Slider
+                  value={filters.maxHourlyRate}
+                  onChange={(_, newValue) => {
+                    setFilters({ ...filters, maxHourlyRate: newValue });
+                    const filtered = workers.filter(worker =>
+                      worker.name.toLowerCase().includes(filters.searchTerm.toLowerCase()) &&
+                      worker.rating >= filters.minRating &&
+                      worker.hourlyRate <= newValue
+                    );
+                    setFilteredWorkers(filtered);
+                  }}
+                  min={0}
+                  max={200}
+                  step={10}
+                  marks
+                  valueLabelDisplay="auto"
+                />
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {workers.length > 0 ? (
-          workers.map((worker) => (
+        {filteredWorkers.length > 0 ? (
+          filteredWorkers.map((worker) => (
             <div
               key={worker._id || worker.id}
               className="bg-white/90 backdrop-blur-sm rounded-xl shadow-lg hover:shadow-2xl transition-all duration-500 hover:-translate-y-2 p-6 border border-gray-100"
@@ -91,11 +179,19 @@ const ProfessionalsPage = () => {
                     {worker.name || "Unknown Professional"}
                   </h2>
                   <p className="text-blue-600 font-medium mb-2">{worker.title || "Service Professional"}</p>
-                  <div className="flex items-center bg-yellow-50 px-3 py-1 rounded-full w-fit">
-                    <span className="text-yellow-500 mr-1">★</span>
-                    <span className="text-gray-700 font-medium">
-                      {worker.rating ? `${worker.rating.toFixed(1)} / 5.0` : "No ratings yet"}
-                    </span>
+                  <div className="flex items-center space-x-2">
+                    <div className="flex items-center bg-yellow-50 px-3 py-1 rounded-full">
+                      <span className="text-yellow-500 mr-1">★</span>
+                      <span className="text-gray-700 font-medium">
+                        {worker.rating ? `${worker.rating.toFixed(1)} / 5.0` : "No ratings yet"}
+                      </span>
+                    </div>
+                    <div className="flex items-center bg-green-50 px-3 py-1 rounded-full">
+                      <FaDollarSign className="text-green-500 mr-1" />
+                      <span className="text-gray-700 font-medium">
+                        {worker.hourlyRate ? `${worker.hourlyRate}/hr` : "Rate not set"}
+                      </span>
+                    </div>
                   </div>
                 </div>
               </div>

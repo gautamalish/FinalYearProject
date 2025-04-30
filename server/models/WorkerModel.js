@@ -33,6 +33,7 @@ const workerSchema = new Schema({
   },
   rating: { type: Number, default: 0 },
   completedJobs: { type: Number, default: 0 },
+  hourlyRate: { type: Number, required: true, min: 0 },
   createdAt: { type: Date, default: Date.now },
 });
 
