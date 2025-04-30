@@ -10,6 +10,9 @@ const workerSchema = new Schema({
   bio: { type: String },
   phone: { type: String },
   profileImage: { type: String },
+  nationality: { type: String },
+  residence: { type: String },
+  experience: { type: String },
   categories: [
     {
       type: Schema.Types.ObjectId,

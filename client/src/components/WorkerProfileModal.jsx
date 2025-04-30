@@ -169,7 +169,7 @@ const WorkerProfileModal = ({ worker, isOpen, onClose }) => {
               <div>
                 <p className="text-sm text-gray-500">Location</p>
                 <p className="font-medium">
-                  {worker.location || "Not specified"}
+                  {worker.residence || "Not specified"}
                 </p>
               </div>
             </div>

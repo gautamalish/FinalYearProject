@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { FaUser, FaEnvelope, FaPhone, FaCamera, FaDollarSign } from 'react-icons/fa';
+import { FaUser, FaEnvelope, FaPhone, FaCamera, FaDollarSign, FaMapMarkerAlt, FaBriefcase } from 'react-icons/fa';
 import axios from 'axios';
 import './Profile.css';
 
@@ -12,7 +12,9 @@ const Profile = () => {
     email: currentUser?.email || '',
     phone: mongoUser?.phone || '',
     profileImage: null,
-    hourlyRate: mongoUser?.hourlyRate || ''
+    hourlyRate: mongoUser?.hourlyRate || '',
+    residence: mongoUser?.residence || '',
+    experience: mongoUser?.experience || ''
   });
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -45,6 +47,8 @@ const Profile = () => {
       }
       if (mongoUser?.role === 'worker') {
         formDataToSend.append('hourlyRate', formData.hourlyRate);
+        formDataToSend.append('residence', formData.residence);
+        formDataToSend.append('experience', formData.experience);
       }
 
       const token = await currentUser.getIdToken();
@@ -63,7 +67,9 @@ const Profile = () => {
         ...prev,
         name: updatedData.name || prev.name,
         phone: updatedData.phone || prev.phone,
-        hourlyRate: updatedData.hourlyRate || prev.hourlyRate
+        hourlyRate: updatedData.hourlyRate || prev.hourlyRate,
+        residence: updatedData.residence || prev.residence,
+        experience: updatedData.experience || prev.experience
       }));
 
       setSuccess('Profile updated successfully!');
@@ -200,24 +206,58 @@ const Profile = () => {
 
 
 
-          {/* Hourly Rate Field */}
+          {/* Worker-specific fields */}
           {mongoUser?.role === 'worker' && (
-            <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <FaDollarSign className="text-gray-400" />
+            <div className="space-y-4">
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <FaDollarSign className="text-gray-400" />
+                </div>
+                <input
+                  type="number"
+                  name="hourlyRate"
+                  placeholder="Hourly Rate (RM)"
+                  className={`pl-10 w-full px-3 py-3 border ${isEditing ? 'border-blue-300 ring-2 ring-blue-100' : 'border-gray-300'} rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${!isEditing && 'bg-gray-50'} transform transition-all duration-300 hover:shadow-sm`}
+                  value={formData.hourlyRate}
+                  onChange={handleInputChange}
+                  disabled={!isEditing}
+                  min="0"
+                  step="0.01"
+                  required
+                />
               </div>
-              <input
-                type="number"
-                name="hourlyRate"
-                placeholder="Hourly Rate (RM)"
-                className={`pl-10 w-full px-3 py-3 border ${isEditing ? 'border-blue-300 ring-2 ring-blue-100' : 'border-gray-300'} rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${!isEditing && 'bg-gray-50'} transform transition-all duration-300 hover:shadow-sm`}
-                value={formData.hourlyRate}
-                onChange={handleInputChange}
-                disabled={!isEditing}
-                min="0"
-                step="0.01"
-                required
-              />
+
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <FaMapMarkerAlt className="text-gray-400" />
+                </div>
+                <input
+                  type="text"
+                  name="residence"
+                  placeholder="Location"
+                  className={`pl-10 w-full px-3 py-3 border ${isEditing ? 'border-blue-300 ring-2 ring-blue-100' : 'border-gray-300'} rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${!isEditing && 'bg-gray-50'} transform transition-all duration-300 hover:shadow-sm`}
+                  value={formData.residence}
+                  onChange={handleInputChange}
+                  disabled={!isEditing}
+                  required
+                />
+              </div>
+
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <FaBriefcase className="text-gray-400" />
+                </div>
+                <input
+                  type="text"
+                  name="experience"
+                  placeholder="Experience"
+                  className={`pl-10 w-full px-3 py-3 border ${isEditing ? 'border-blue-300 ring-2 ring-blue-100' : 'border-gray-300'} rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${!isEditing && 'bg-gray-50'} transform transition-all duration-300 hover:shadow-sm`}
+                  value={formData.experience}
+                  onChange={handleInputChange}
+                  disabled={!isEditing}
+                  required
+                />
+              </div>
             </div>
           )}
 

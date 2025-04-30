@@ -22,6 +22,7 @@ const WorkerRegistration = () => {
     category: "",
     hourlyRate: "",
     profileImage: null,
+    experience: "",
   });
   
   const [categories, setCategories] = useState([]);
@@ -69,6 +70,7 @@ const handleSubmit = async (e) => {
     formDataToSend.append("residence", formData.residence);
     formDataToSend.append("category", formData.category);
     formDataToSend.append("hourlyRate", formData.hourlyRate);
+    formDataToSend.append("experience", formData.experience);
     if (formData.profileImage) {
       formDataToSend.append("profileImage", formData.profileImage);
     }
@@ -197,6 +199,20 @@ const handleSubmit = async (e) => {
             </select>
           </div>
 
+          <div className="relative">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <FaUser className="text-gray-400" />
+            </div>
+            <textarea
+              name="experience"
+              placeholder="Your work experience"
+              className="pl-10 w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              value={formData.experience}
+              onChange={handleInputChange}
+              rows="3"
+              required
+            />
+          </div>
           <div className="space-y-2">
             <label className="block text-sm font-medium text-gray-700">
               Profile Image

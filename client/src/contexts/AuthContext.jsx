@@ -27,7 +27,9 @@ export function AuthProvider({ children }) {
   const fetchMongoUser = async (firebaseUser) => {
     try {
       const token = await firebaseUser.getIdToken();
-      const response = await axios.get(
+      
+      // First get the basic user data
+      const userResponse = await axios.get(
         `http://localhost:3000/api/users/firebase/${firebaseUser.uid}`,
         {
           headers: { 
@@ -36,13 +38,44 @@ export function AuthProvider({ children }) {
           },
         }
       );
-      
-      if (response.data) {
-        // If user is a worker, fetch worker data to get hourlyRate
-        if (response.data.role === 'worker') {
+  
+      const userData = userResponse.data;
+  
+      // If user is a worker, fetch additional worker details using Firebase UID
+      if (userData.role === 'worker') {
+        try {
+          // Use the Firebase UID to fetch worker data
+          const workerResponse = await axios.get(
+            `http://localhost:3000/api/workers/details/${firebaseUser.uid}`, // Using Firebase UID
+            {
+              headers: { 
+                Authorization: `Bearer ${token}`,
+                'Content-Type': 'application/json'
+              },
+            }
+          );
+  
+          // Combine the data with worker details taking priority
+          const combinedData = {
+            ...userData,
+            ...workerResponse.data,
+            // Explicitly map worker-specific fields
+            hourlyRate: workerResponse.data.hourlyRate,
+            residence: workerResponse.data.residence,
+            experience: workerResponse.data.experience,
+            // Include categories if they exist
+            categories: workerResponse.data.categories || userData.categories
+          };
+          
+          setMongoUser(combinedData);
+          return combinedData;
+        } catch (workerError) {
+          console.log("Worker details not found, trying with user _id");
+          
+          // Fallback: Try with user's MongoDB _id if Firebase UID fails
           try {
             const workerResponse = await axios.get(
-              `http://localhost:3000/api/workers/${firebaseUser.uid}`,
+              `http://localhost:3000/api/workers/details/${userData._id}`,
               {
                 headers: { 
                   Authorization: `Bearer ${token}`,
@@ -50,26 +83,29 @@ export function AuthProvider({ children }) {
                 },
               }
             );
+  
+            const combinedData = {
+              ...userData,
+              ...workerResponse.data,
+              hourlyRate: workerResponse.data.hourlyRate,
+              residence: workerResponse.data.residence,
+              experience: workerResponse.data.experience,
+              categories: workerResponse.data.categories || userData.categories
+            };
             
-            if (workerResponse.data) {
-              // Combine user data with worker data
-              const combinedData = {
-                ...response.data,
-                hourlyRate: workerResponse.data.hourlyRate
-              };
-              setMongoUser(combinedData);
-              return combinedData;
-            }
-          } catch (workerError) {
-            console.error("Error fetching worker data:", workerError.response || workerError);
-            // Continue with just the user data if worker data fetch fails
+            setMongoUser(combinedData);
+            return combinedData;
+          } catch (secondError) {
+            console.log("Worker data not found, using basic user data");
+            setMongoUser(userData);
+            return userData;
           }
         }
-        
-        setMongoUser(response.data);
-        return response.data;
       }
-      return null;
+  
+      // For non-worker users
+      setMongoUser(userData);
+      return userData;
     } catch (error) {
       console.error("Error fetching MongoDB user:", error.response || error);
       return null;

@@ -26,6 +26,7 @@ const userSchema = new mongoose.Schema({
     min: 0,
   },
   profilePicture: String,
+  residence: { type: String },
   createdAt: { type: Date, default: Date.now },
 });
 

@@ -310,6 +310,11 @@ app.patch("/api/users/:firebaseId/role", verifyUser, async (req, res) => {
         phone: user.phone || "",
         categories: req.body.categories || [],
         profileImage: req.body.profilePicture || "",
+        // Add location fields
+        nationality: req.body.nationality || "",
+        residence: req.body.residence || "",
+        // Add experience field
+        experience: req.body.experience || "",
         rating: 0,
         completedJobs: 0,
         // Add other worker-specific fields with defaults
@@ -694,8 +699,8 @@ app.post(
 
     try {
       // Validate required fields
-      const { phone, nationality, residence, category, hourlyRate } = req.body;
-      if (!phone || !nationality || !residence || !category || !hourlyRate) {
+      const { phone, nationality, residence, category, hourlyRate, experience } = req.body;
+      if (!phone || !nationality || !residence || !category || !hourlyRate || !experience) {
         return res
           .status(400)
           .json({ message: "Please fill in all required fields" });
@@ -727,6 +732,7 @@ app.post(
       const clientData = await Client.findOne({ firebaseUID }).lean();
 
       // Create worker document with data from user and form
+      // Create worker document with data from user and form
       const workerData = {
         firebaseUID: user.firebaseUID,
         name: user.name,
@@ -734,6 +740,7 @@ app.post(
         phone,
         nationality,
         residence,
+        experience,
         categories: [category], // Store as array since schema expects array
         hourlyRate: parsedHourlyRate,
         profileImage: req.file ? req.file.path : "",
@@ -792,7 +799,7 @@ app.get("/api/workers", async (req, res) => {
   try {
     const workers = await Worker.find({ role: "worker" })
       .select(
-        "name email phone profilePicture rating categories firebaseUID createdAt hourlyRate"
+        "name email phone profilePicture rating categories firebaseUID createdAt hourlyRate experience nationality residence"
       )
       .populate("categories", "name description thumbnail")
       .lean();
@@ -866,6 +873,7 @@ app.get("/api/workers/:firebaseUID", async (req, res) => {
     // Find worker by firebaseUID
     const worker = await Worker.findOne({ firebaseUID: req.params.firebaseUID })
       .populate("categories", "name description")
+      .select("+experience +nationality +residence")
       .lean();
 
     if (!worker) {
