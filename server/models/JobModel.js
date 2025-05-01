@@ -16,6 +16,8 @@ const jobSchema = new mongoose.Schema({
     enum: ["pending", "accepted", "in_progress", "completed", "cancelled"],
     default: "pending",
   },
+  startTime: { type: Date },        
+  endTime: { type: Date },
   paymentStatus: {
     type: String,
     enum: ["pending", "paid", "refunded"],

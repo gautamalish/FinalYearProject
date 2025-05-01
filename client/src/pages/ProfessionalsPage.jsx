@@ -3,7 +3,6 @@ import { useAuth } from "../contexts/AuthContext";
 import axios from "axios";
 import WorkerProfileModal from "../components/WorkerProfileModal";
 import { FaEnvelope, FaPhone, FaStar, FaDollarSign, FaFilter } from "react-icons/fa";
-import { Slider } from "@mui/material";
 
 const ProfessionalsPage = () => {
   const { currentUser } = useAuth();
@@ -18,6 +17,10 @@ const ProfessionalsPage = () => {
     maxHourlyRate: 200,
     searchTerm: ""
   });
+  
+  // Rating and hourly rate options for select boxes
+  const ratingOptions = [0, 1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5];
+  const hourlyRateOptions = [100, 200, 300, 400, 500, 600, 700, 800, 900, 1000];
   const [showFilters, setShowFilters] = useState(false);
 
   useEffect(() => {
@@ -109,49 +112,57 @@ const ProfessionalsPage = () => {
 
           {showFilters && (
             <div className="bg-white p-6 rounded-lg shadow-lg mb-6">
-              <div className="mb-6">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Minimum Rating
-                </label>
-                <Slider
-                  value={filters.minRating}
-                  onChange={(_, newValue) => {
-                    setFilters({ ...filters, minRating: newValue });
-                    const filtered = workers.filter(worker =>
-                      worker.name.toLowerCase().includes(filters.searchTerm.toLowerCase()) &&
-                      worker.rating >= newValue &&
-                      worker.hourlyRate <= filters.maxHourlyRate
-                    );
-                    setFilteredWorkers(filtered);
-                  }}
-                  min={0}
-                  max={5}
-                  step={0.5}
-                  marks
-                  valueLabelDisplay="auto"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Maximum Hourly Rate ($)
-                </label>
-                <Slider
-                  value={filters.maxHourlyRate}
-                  onChange={(_, newValue) => {
-                    setFilters({ ...filters, maxHourlyRate: newValue });
-                    const filtered = workers.filter(worker =>
-                      worker.name.toLowerCase().includes(filters.searchTerm.toLowerCase()) &&
-                      worker.rating >= filters.minRating &&
-                      worker.hourlyRate <= newValue
-                    );
-                    setFilteredWorkers(filtered);
-                  }}
-                  min={0}
-                  max={200}
-                  step={10}
-                  marks
-                  valueLabelDisplay="auto"
-                />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Minimum Rating
+                  </label>
+                  <select
+                    className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    value={filters.minRating}
+                    onChange={(e) => {
+                      const newValue = parseFloat(e.target.value);
+                      setFilters({ ...filters, minRating: newValue });
+                      const filtered = workers.filter(worker =>
+                        worker.name.toLowerCase().includes(filters.searchTerm.toLowerCase()) &&
+                        worker.rating >= newValue &&
+                        worker.hourlyRate <= filters.maxHourlyRate
+                      );
+                      setFilteredWorkers(filtered);
+                    }}
+                  >
+                    {ratingOptions.map((rating) => (
+                      <option key={rating} value={rating}>
+                        {rating === 0 ? 'Any Rating' : `${rating} Stars or higher`}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Maximum Hourly Rate (RM)
+                  </label>
+                  <select
+                    className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    value={filters.maxHourlyRate}
+                    onChange={(e) => {
+                      const newValue = parseInt(e.target.value);
+                      setFilters({ ...filters, maxHourlyRate: newValue });
+                      const filtered = workers.filter(worker =>
+                        worker.name.toLowerCase().includes(filters.searchTerm.toLowerCase()) &&
+                        worker.rating >= filters.minRating &&
+                        worker.hourlyRate <= newValue
+                      );
+                      setFilteredWorkers(filtered);
+                    }}
+                  >
+                    {hourlyRateOptions.map((rate) => (
+                      <option key={rate} value={rate}>
+                        RS {rate} or less
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
             </div>
           )}
@@ -187,9 +198,8 @@ const ProfessionalsPage = () => {
                       </span>
                     </div>
                     <div className="flex items-center bg-green-50 px-3 py-1 rounded-full">
-                      <FaDollarSign className="text-green-500 mr-1" />
                       <span className="text-gray-700 font-medium">
-                        {worker.hourlyRate ? `${worker.hourlyRate}/hr` : "Rate not set"}
+                        {worker.hourlyRate ? `RS ${worker.hourlyRate}/hr` : "Rate not set"}
                       </span>
                     </div>
                   </div>

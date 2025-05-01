@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import axios from 'axios';
-import { FaMapMarkerAlt, FaCalendarAlt, FaClock, FaStar } from 'react-icons/fa';
+import { FaMapMarkerAlt, FaCalendarAlt, FaClock, FaStar, FaDollarSign } from 'react-icons/fa';
 
 const ClientDashboard = () => {
   const navigate = useNavigate();
@@ -98,7 +98,9 @@ const ClientDashboard = () => {
                 </div>
                 
                 <div className="p-6">
-                  <h2 className="text-xl font-semibold text-gray-800 mb-4">{job.title || 'Service Request'}</h2>
+                  <h2 className="text-xl font-semibold text-gray-800 mb-4">
+                    {job.worker ? `Service request to ${job.worker.name}` : 'Service Request'}
+                  </h2>
                   
                   <div className="space-y-3 text-sm text-gray-600">
                     <div className="flex items-center">
@@ -116,12 +118,24 @@ const ClientDashboard = () => {
                   </div>
 
                   <div className="mt-6 space-y-4">
-                    <button
-                      onClick={() => navigate(`/job-details/${job._id}`)}
-                      className="w-full px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-                    >
-                      View Details
-                    </button>
+                    <div className="flex flex-col space-y-2">
+                      <button
+                        onClick={() => navigate(`/job-details/${job._id}`)}
+                        className="w-full px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                      >
+                        View Details
+                      </button>
+
+                      {job.status === 'completed' && job.paymentStatus === 'pending' && (
+                        <button
+                          onClick={() => navigate(`/payment/${job._id}`)}
+                          className="w-full px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors flex items-center justify-center"
+                        >
+                          <FaDollarSign className="mr-2" />
+                          Pay Now (Rs. {job.totalAmount})
+                        </button>
+                      )}
+                    </div>
 
                     {job.status === 'completed' && !job.review && (
                       <div className="text-center">

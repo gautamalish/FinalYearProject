@@ -15,6 +15,8 @@ import WorkerRegistration from "./pages/WorkerRegistration";
 import Profile from "./pages/Profile";
 import JobDetails from "./pages/JobDetails";
 import ClientDashboard from "./pages/ClientDashboard";
+import WorkerDashboard from "./pages/WorkerDashboard";
+import PaymentPage from "./pages/PaymentPage";
 import { NotificationProvider } from "./contexts/NotificationContext";
 
 // This component will be rendered inside BrowserRouter
@@ -51,6 +53,8 @@ function App() {
             <Route path="/profile" element={<Profile />} />
             <Route path="/job-details/:jobId" element={<JobDetails />} />
             <Route path="/dashboard" element={<ClientDashboard />} />
+            <Route path="/worker-dashboard" element={<WorkerDashboard />} />
+            <Route path="/payment/:jobId" element={<PaymentPage />} />
             <Route
               path="/admin"
               element={

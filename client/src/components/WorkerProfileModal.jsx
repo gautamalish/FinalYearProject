@@ -178,7 +178,7 @@ const WorkerProfileModal = ({ worker, isOpen, onClose }) => {
               <div>
                 <p className="text-sm text-gray-500">Hourly Rate</p>
                 <p className="font-medium">
-                  {worker.hourlyRate ? `$${worker.hourlyRate}/hr` : "Not specified"}
+                  {worker.hourlyRate ? `RS ${worker.hourlyRate}/hr` : "Not specified"}
                 </p>
               </div>
             </div>

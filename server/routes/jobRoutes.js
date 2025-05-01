@@ -12,6 +12,9 @@ router.post('/create', jobController.createJob);
 // Get jobs for client
 router.get('/client', jobController.getClientJobs);
 
+// Get jobs for worker
+router.get('/worker', jobController.getWorkerJobs);
+
 // Get job details
 router.get('/:jobId', jobController.getJobDetails);
 

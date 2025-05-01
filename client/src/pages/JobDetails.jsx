@@ -46,20 +46,32 @@ const JobDetails = () => {
 
   const handleStatusUpdate = async (newStatus) => {
     if (!currentUser || !jobId) return;
-
+  
     try {
       setUpdateStatus('updating');
       const token = await currentUser.getIdToken();
-      await axios.patch(`/api/jobs/${jobId}/status`, 
-        { status: newStatus },
-        { headers: { Authorization: `Bearer ${token}` }}
-      );
-      
-      // Update local state
-      setJob(prev => ({ ...prev, status: newStatus }));
+  
+      const payload = { status: newStatus };
+  
+      if (newStatus === 'in_progress') {
+        payload.startTime = new Date().toISOString();
+      } else if (newStatus === 'completed') {
+        payload.endTime = new Date().toISOString();
+      }
+  
+      await axios.patch(`/api/jobs/${jobId}/status`, payload, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+  
+      // Update job locally
+      setJob(prev => ({
+        ...prev,
+        status: newStatus,
+        ...(payload.startTime && { startTime: payload.startTime }),
+        ...(payload.endTime && { endTime: payload.endTime })
+      }));
+  
       setUpdateStatus('success');
-      
-      // Reset status message after 3 seconds
       setTimeout(() => setUpdateStatus(''), 3000);
     } catch (err) {
       console.error('Error updating job status:', err);
@@ -67,6 +79,7 @@ const JobDetails = () => {
       setTimeout(() => setUpdateStatus(''), 3000);
     }
   };
+  
 
   if (loading) {
     return (
@@ -140,7 +153,11 @@ const JobDetails = () => {
         </div>
 
         <div className="p-8">
-          <h1 className="text-2xl font-bold text-gray-800 mb-6">{job.title}</h1>
+          <h1 className="text-2xl font-bold text-gray-800 mb-6">
+            {mongoUser?.role === 'client' 
+              ? `Service request to ${job.worker.name}` 
+              : `Service request from ${job.clientName}`}
+          </h1>
           
           {/* Job Details */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">

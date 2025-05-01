@@ -43,7 +43,7 @@ exports.createJob = async (req, res) => {
 
     // Create the job with worker's hourly rate
     const job = new Job({
-      title: `Service request from ${clientName}`,
+      title: `Service request from ${clientName} to ${worker.name}`,
       description,
       status: 'pending',
       paymentStatus: 'pending',
@@ -139,6 +139,30 @@ exports.getClientJobs = async (req, res) => {
   }
 };
 
+// Get jobs for worker
+exports.getWorkerJobs = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    
+    // Find the worker associated with this user
+    const worker = await Worker.findOne({ firebaseUID: req.user.firebaseUID });
+    
+    if (!worker) {
+      return res.status(404).json({ message: 'Worker profile not found' });
+    }
+    
+    // Find all jobs assigned to this worker
+    const jobs = await Job.find({ worker: worker._id })
+      .populate('client')
+      .sort({ createdAt: -1 });
+    
+    res.status(200).json(jobs);
+  } catch (error) {
+    console.error('Error fetching worker jobs:', error);
+    res.status(500).json({ message: 'Failed to fetch jobs' });
+  }
+};
+
 // Update job status
 exports.updateJobStatus = async (req, res) => {
   try {
@@ -167,13 +191,19 @@ exports.updateJobStatus = async (req, res) => {
     
     // Update job status
     job.status = status;
+    
+    // Set startTime when job status changes to 'in_progress'
+    if (status === 'in_progress') {
+      job.startTime = new Date();
+    }
+    
     if (status === 'completed') {
       job.completedAt = new Date();
-      // Calculate duration in hours (assuming job starts when status changes to 'in_progress')
-      if (job.status === 'in_progress') {
-        const startTime = new Date(job.createdAt);
-        const endTime = new Date();
-        const durationHours = (endTime - startTime) / (1000 * 60 * 60); // Convert milliseconds to hours
+      job.endTime = new Date();
+      
+      // Calculate duration in hours if startTime exists
+      if (job.startTime) {
+        const durationHours = (job.endTime - job.startTime) / (1000 * 60 * 60); // Convert milliseconds to hours
         job.duration = parseFloat(durationHours.toFixed(2));
         job.totalAmount = job.hourlyRate * job.duration;
       }

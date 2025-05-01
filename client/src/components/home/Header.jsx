@@ -90,7 +90,7 @@ const Header = () => {
             <>
               <button
                 className="px-4 py-2 rounded-lg bg-white/10 text-white font-semibold hover:bg-white/20 transition-all"
-                onClick={() => navigate(mongoUser?.role === 'admin' ? '/admin' : '/dashboard')}
+                onClick={() => navigate(mongoUser?.role === 'admin' ? '/admin' :mongoUser?.role==='client'?'/dashboard':'/worker-dashboard')}
               >
                 Dashboard
               </button>
