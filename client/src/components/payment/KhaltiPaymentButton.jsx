@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
-import { useAuth } from '../contexts/AuthContext';
-import { initiatePayment, verifyPayment } from '../services/payment';
+import React, { useState, useEffect } from 'react';
+import { useAuth } from '../../contexts/AuthContext';
+import { initiatePayment, verifyPayment } from '../../services/payment';
 import { FaMoneyBillWave, FaSpinner } from 'react-icons/fa';
 
 /**
@@ -16,8 +16,21 @@ const KhaltiPaymentButton = ({ job, onPaymentSuccess }) => {
   const [paymentDetails, setPaymentDetails] = useState(null);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
 
-  // Khalti public key from environment variable
-  const KHALTI_PUBLIC_KEY = import.meta.env.VITE_KHALTI_PUBLIC_KEY || '3020189a1caf49208f9e3c9aa3801b5e';
+  // Khalti public key from environment variable (using test key for sandbox)
+  // For test mode, we need to use the test key provided by Khalti
+  // The key format should be like "test_public_key_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+  // Using a valid test key format for Khalti sandbox
+  // Note: This is a valid test public key format for Khalti sandbox
+  // Get Khalti public key from environment variable
+  const KHALTI_PUBLIC_KEY = import.meta.env.VITE_KHALTI_PUBLIC_KEY;
+  
+  // Use Khalti sandbox for testing
+  const IS_SANDBOX = true;
+  
+  // Log the configured key for debugging
+  useEffect(() => {
+    console.log('Configured Khalti public key:', KHALTI_PUBLIC_KEY);
+  }, []);
 
   // Function to initiate payment process
   const handleInitiatePayment = async () => {
@@ -42,15 +55,38 @@ const KhaltiPaymentButton = ({ job, onPaymentSuccess }) => {
     if (!paymentDetails) return;
     
     // Convert amount to paisa (Khalti uses paisa)
-    const amountInPaisa = paymentDetails.totalAmount * 100;
+    const amountInPaisa = Math.round(paymentDetails.totalAmount * 100);
+    
+    console.log('Payment amount in paisa:', amountInPaisa);
+    console.log('Using Khalti public key:', KHALTI_PUBLIC_KEY);
     
     // Load Khalti checkout script if not already loaded
     if (!window.KhaltiCheckout) {
       const script = document.createElement('script');
-      script.src = 'https://khalti.s3.ap-south-1.amazonaws.com/KPG/dist/2020.12.22.0.0.0/khalti-checkout.iffe.js';
+      // Use the correct script for Khalti checkout
+      script.src = 'https://khalti.com/static/khalti-checkout.js';
       script.async = true;
-      script.onload = () => initializeKhaltiCheckout(amountInPaisa);
-      document.body.appendChild(script);
+      script.onload = () => {
+        console.log('Khalti script loaded successfully');
+        initializeKhaltiCheckout(amountInPaisa);
+      };
+      script.onerror = (error) => {
+        console.error('Failed to load Khalti script:', error);
+        setError('Failed to load payment gateway. Please try again.');
+        setLoading(false);
+      };
+      try {
+        document.body.appendChild(script);
+      } catch (error) {
+        console.error('Error appending Khalti script to document:', error);
+        setError('Failed to load payment gateway. Please try again.');
+        setLoading(false);
+      } finally {
+        // Ensure loading state is reset if script fails to load
+        if (!window.KhaltiCheckout) {
+          setLoading(false);
+        }
+      }
     } else {
       initializeKhaltiCheckout(amountInPaisa);
     }
@@ -58,13 +94,36 @@ const KhaltiPaymentButton = ({ job, onPaymentSuccess }) => {
 
   // Initialize Khalti checkout
   const initializeKhaltiCheckout = (amountInPaisa) => {
-    const config = {
-      // replace this key with yours
-      "publicKey": KHALTI_PUBLIC_KEY,
-      "productIdentity": job._id,
-      "productName": job.title,
-      "productUrl": window.location.href,
-      "eventHandler": {
+    try {
+      if (!KHALTI_PUBLIC_KEY) {
+        setError('Payment gateway configuration error - missing public key');
+        console.error('Khalti public key is undefined');
+        return;
+      }
+    
+      if (!KHALTI_PUBLIC_KEY.startsWith('test_public_key_') && 
+          !KHALTI_PUBLIC_KEY.startsWith('live_public_key_')) {
+        setError('Invalid payment gateway configuration');
+        console.error('Invalid Khalti key format:', KHALTI_PUBLIC_KEY);
+        return;
+      }
+      // Log the amount in paisa for debugging
+      console.log('Payment amount in paisa:', amountInPaisa);
+      console.log('Using Khalti public key:', KHALTI_PUBLIC_KEY);
+      
+      // Make sure amount is an integer
+      const amount = Math.round(amountInPaisa);
+      const config = {
+        // Merchant configuration - key must be in correct format
+        "publicKey": KHALTI_PUBLIC_KEY,
+        "productIdentity": job._id.toString(),
+        "productName": job.title || 'Service Payment',
+        "productUrl": window.location.href,
+        // Amount in paisa (Khalti requirement)
+        "amount": amount,
+        // Enable test mode for sandbox testing
+        "testMode": true,
+        "eventHandler": {
         async onSuccess(payload) {
           // Handle successful payment
           try {
@@ -91,17 +150,22 @@ const KhaltiPaymentButton = ({ job, onPaymentSuccess }) => {
         },
         onError(error) {
           console.error('Khalti payment error:', error);
-          setError('Payment failed. Please try again.');
+          // Provide more detailed error information for debugging
+          setError(`Payment failed: ${error.message || JSON.stringify(error) || 'Unknown error'}. Please try again.`);
         },
         onClose() {
           console.log('Khalti payment widget closed');
         }
-      },
-      "amount": amountInPaisa
+      }
     };
 
-    const checkout = new window.KhaltiCheckout(config);
-    checkout.show({ popUp: true });
+      const checkout = new window.KhaltiCheckout(config);
+      checkout.show({ popUp: true });
+    } catch (error) {
+      console.error('Error initializing Khalti checkout:', error);
+      setError('Failed to initialize payment gateway. Please try again.');
+      setLoading(false);
+    }
   };
 
   // Payment Modal Component

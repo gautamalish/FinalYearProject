@@ -57,7 +57,7 @@ const SignIn = () => {
       });
 
       // Redirect based on role
-      if (response.data.role === "admin") {
+      if (response.data.data.role === "admin") {
         navigate("/admin");
       } else {
         navigate("/");
@@ -97,9 +97,9 @@ const SignIn = () => {
       const response = await axios.get("/api/users/me", {
         headers: { Authorization: `Bearer ${token}` },
       });
-
+      console.log("Response:",response.data.data.role);
       // Redirect based on role
-      if (response.data.role === "admin") {
+      if (response.data.data.role === "admin") {
         navigate("/admin");
       } else {
         navigate("/");

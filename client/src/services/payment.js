@@ -61,17 +61,23 @@ export const initiatePayment = async (jobId, token) => {
  */
 export const verifyPayment = async (jobId, khaltiToken, amount, token) => {
   try {
+    console.log('Verifying payment with:', { 
+      jobId, 
+      amount, 
+      token: khaltiToken.substring(0, 10) + '...' 
+    });
+
     const response = await axios.post(
       `${PAYMENT_ENDPOINT}/verify`,
-      {
-        jobId,
-        token: khaltiToken,
-        amount
-      },
+      { jobId, token: khaltiToken, amount },
       getAuthConfig(token)
     );
     return response.data;
   } catch (error) {
+    console.error('Full verification error:', error);
+    if (error.response) {
+      console.error('Response data:', error.response.data);
+    }
     handleApiError(error);
   }
 };

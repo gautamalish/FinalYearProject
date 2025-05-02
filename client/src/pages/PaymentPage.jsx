@@ -242,7 +242,6 @@ const PaymentPage = () => {
                   disabled={processing}
                   className={`w-full px-6 py-3 text-white rounded-lg flex items-center justify-center space-x-2 ${processing ? 'bg-gray-400 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700'}`}
                 >
-                  <FaDollarSign className="text-xl" />
                   <span className="text-lg font-semibold">
                     {processing ? 'Processing...' : 'Pay Now'}
                   </span>
