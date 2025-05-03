@@ -10,6 +10,8 @@ import {
   FaArrowRight,
   FaEnvelope,
   FaPhone,
+  FaChevronLeft,
+  FaChevronRight,
 } from "react-icons/fa";
 import WorkerProfileModal from "../components/WorkerProfileModal";
 
@@ -26,6 +28,10 @@ const ServicesPage = () => {
   const [selectedWorker, setSelectedWorker] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const { category } = useParams();
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 8;
 
   useEffect(() => {
     const fetchData = async () => {
@@ -84,6 +90,7 @@ const ServicesPage = () => {
     navigate(`/services/${categoryName.toLowerCase()}`, {
       state: { categoryId, categoryName },
     });
+    setCurrentPage(1); // Reset to first page when category changes
   };
 
   const filteredItems = category
@@ -105,6 +112,28 @@ const ServicesPage = () => {
           }
           return b.viewCount - a.viewCount;
         });
+
+  // Pagination logic
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentItems = filteredItems.slice(indexOfFirstItem, indexOfLastItem);
+  const totalPages = Math.ceil(filteredItems.length / itemsPerPage);
+
+  const paginate = (pageNumber) => setCurrentPage(pageNumber);
+
+  const handlePrevPage = () => {
+    if (currentPage > 1) {
+      setCurrentPage(currentPage - 1);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  };
+
+  const handleNextPage = () => {
+    if (currentPage < totalPages) {
+      setCurrentPage(currentPage + 1);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  };
 
   if (isLoading) {
     return (
@@ -169,7 +198,10 @@ const ServicesPage = () => {
               type="text"
               placeholder="Search services..."
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                setCurrentPage(1); // Reset to first page when search changes
+              }}
               onFocus={() => setIsSearchFocused(true)}
               onBlur={() => setIsSearchFocused(false)}
               className="w-full pl-10 pr-4 py-3 rounded-xl border-2 border-gray-200 focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition-all duration-300 bg-white/80 backdrop-blur-sm shadow-sm hover:shadow-md"
@@ -177,7 +209,10 @@ const ServicesPage = () => {
           </div>
           <select
             value={sortBy}
-            onChange={(e) => setSortBy(e.target.value)}
+            onChange={(e) => {
+              setSortBy(e.target.value);
+              setCurrentPage(1); // Reset to first page when sort changes
+            }}
             className="w-full md:w-auto px-6 py-3 rounded-xl border-2 border-gray-200 focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition-all duration-300 bg-white/80 backdrop-blur-sm shadow-sm hover:shadow-md cursor-pointer text-gray-700"
           >
             <option value="name">Sort by Name</option>
@@ -190,7 +225,7 @@ const ServicesPage = () => {
       <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
         {category
           ? // Display Workers for Selected Category
-            filteredItems.map((worker) => (
+            currentItems.map((worker) => (
               <div
                 key={worker._id}
                 className="bg-white/90 backdrop-blur-sm rounded-xl shadow-lg hover:shadow-2xl transition-all duration-500 hover:-translate-y-2 p-6 border border-gray-100"
@@ -269,7 +304,7 @@ const ServicesPage = () => {
               </div>
             ))
           : // Display Categories
-            filteredItems.map((category, index) => (
+            currentItems.map((category, index) => (
               <button
                 key={category.id}
                 onClick={() =>
@@ -315,6 +350,60 @@ const ServicesPage = () => {
               ? "No professionals found for this category."
               : "No services found matching your search."}
           </p>
+        </div>
+      )}
+
+      {/* Pagination Controls */}
+      {filteredItems.length > itemsPerPage && (
+        <div className="flex justify-center mt-8 mb-12">
+          <nav className="flex items-center gap-2">
+            <button
+              onClick={handlePrevPage}
+              disabled={currentPage === 1}
+              className={`px-4 py-2 rounded-lg border flex items-center gap-1 ${
+                currentPage === 1
+                  ? "text-gray-400 border-gray-200 cursor-not-allowed"
+                  : "text-blue-600 border-blue-200 hover:bg-blue-50"
+              }`}
+            >
+              <FaChevronLeft />
+              Previous
+            </button>
+
+            <div className="flex items-center gap-1">
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map(
+                (number) => (
+                  <button
+                    key={number}
+                    onClick={() => {
+                      paginate(number);
+                      window.scrollTo({ top: 0, behavior: "smooth" });
+                    }}
+                    className={`w-10 h-10 flex items-center justify-center rounded-lg ${
+                      currentPage === number
+                        ? "bg-blue-600 text-white"
+                        : "text-blue-600 hover:bg-blue-50"
+                    }`}
+                  >
+                    {number}
+                  </button>
+                )
+              )}
+            </div>
+
+            <button
+              onClick={handleNextPage}
+              disabled={currentPage === totalPages}
+              className={`px-4 py-2 rounded-lg border flex items-center gap-1 ${
+                currentPage === totalPages
+                  ? "text-gray-400 border-gray-200 cursor-not-allowed"
+                  : "text-blue-600 border-blue-200 hover:bg-blue-50"
+              }`}
+            >
+              Next
+              <FaChevronRight />
+            </button>
+          </nav>
         </div>
       )}
 
