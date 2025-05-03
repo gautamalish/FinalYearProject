@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
 import { fetchCategories } from "../../services/admin";
@@ -6,7 +6,6 @@ import axios from "axios";
 import defaultImage from "../../assets/gardener.jpg";
 import { fetchPopularCategories } from "../../services/admin";
 import { motion } from "framer-motion";
-import { useInView } from "react-intersection-observer";
 import {
   FaSearch,
   FaUserTie,
@@ -46,7 +45,7 @@ const ServiceCategoriesPage = () => {
   const [popularCategories, setPopularCategories] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
-  const { currentUser,fetchMongoUser } = useAuth();
+  const { currentUser } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -55,9 +54,10 @@ const ServiceCategoriesPage = () => {
       setError(null);
 
       try {
-        console.log("Starting to fetch categories..."); // Debug 1
-        const allCategories = await fetchCategories();
-        console.log("Raw categories data:", allCategories); // Debug 2
+        const [allCategories, popular] = await Promise.all([
+          fetchCategories(),
+          fetchPopularCategories(4) // Fetch only 4 popular categories
+        ]);
 
         if (!Array.isArray(allCategories)) {
           throw new Error("Categories data is not an array");
@@ -71,21 +71,8 @@ const ServiceCategoriesPage = () => {
           isPopular: category.popular || false,
         }));
 
-        console.log("Transformed categories:", transformedCategories); // Debug 3
         setCategories(transformedCategories);
-
-        // Try to get popular categories
-        try {
-          console.log("Fetching popular categories..."); // Debug 4
-          const popular = await fetchPopularCategories();
-          console.log("Popular categories:", popular); // Debug 5
-          setPopularCategories(Array.isArray(popular) ? popular : []);
-        } catch (popError) {
-          console.log("Using fallback popular categories");
-          setPopularCategories(
-            transformedCategories.filter((cat) => cat.isPopular).slice(0, 4)
-          );
-        }
+        setPopularCategories(Array.isArray(popular) ? popular.slice(0, 4) : []);
       } catch (err) {
         console.error("Failed to fetch categories:", err);
         setError("Couldn't load categories. Please refresh to try again.");
@@ -98,9 +85,8 @@ const ServiceCategoriesPage = () => {
 
     fetchServiceCategories();
   }, []);
-  console.log(currentUser);
+
   const handleCategorySelection = async (categoryId, categoryName) => {
-    // Track view if user is logged in
     if (currentUser) {
       try {
         const token = await currentUser.getIdToken();
@@ -197,11 +183,8 @@ const ServiceCategoriesPage = () => {
         </motion.div>
       </motion.section>
 
-      {/* Popular Categories Section */}
-      <motion.section 
-        variants={fadeInUp}
-        className="mb-20"
-      >
+      {/* Popular Categories Section - Show only 4 */}
+      <motion.section variants={fadeInUp} className="mb-20">
         <motion.div 
           variants={staggerContainer}
           className="flex justify-between items-center mb-8"
@@ -228,8 +211,8 @@ const ServiceCategoriesPage = () => {
           variants={staggerContainer}
           className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6"
         >
-          {Array.isArray(popularCategories) && popularCategories.length > 0 ? (
-            popularCategories.map((category) => (
+          {popularCategories.length > 0 ? (
+            popularCategories.slice(0, 4).map((category) => (
               <motion.button
                 variants={scaleIn}
                 whileHover={{ scale: 1.03 }}
@@ -245,9 +228,7 @@ const ServiceCategoriesPage = () => {
               >
                 <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent z-10 group-hover:opacity-75 transition-opacity duration-500"></div>
                 <img
-                  src={
-                    category.thumbnail?.url || category.imageUrl || defaultImage
-                  }
+                  src={category.thumbnail?.url || category.imageUrl || defaultImage}
                   alt={`Popular ${category.name} service`}
                   className="w-full h-64 object-cover transition-transform duration-700 group-hover:scale-110"
                   onError={(e) => {
@@ -257,11 +238,9 @@ const ServiceCategoriesPage = () => {
                 <div className="absolute bottom-0 left-0 p-6 z-20 w-full transform transition-transform duration-500 group-hover:translate-y-[-8px]">
                   <div className="flex items-center gap-2 mb-2">
                     <FaStar className="text-yellow-400 animate-pulse" />
-                    {popularCategories.slice(0, 3).some(c => c._id === category._id || c.id === category.id) && (
-                      <span className="bg-yellow-500 text-white text-xs font-semibold px-3 py-1 rounded-full shadow-lg">
-                        Popular
-                      </span>
-                    )}
+                    <span className="bg-yellow-500 text-white text-xs font-semibold px-3 py-1 rounded-full shadow-lg">
+                      Popular
+                    </span>
                   </div>
                   <h3 className="text-2xl font-bold text-white mb-2 group-hover:text-yellow-300 transition-colors duration-300">
                     {category.name}
@@ -284,11 +263,8 @@ const ServiceCategoriesPage = () => {
         </motion.div>
       </motion.section>
 
-      {/* All Service Categories */}
-      <motion.section 
-        variants={fadeInUp}
-        className="mb-20"
-      >
+      {/* All Service Categories - Show only 4 */}
+      <motion.section variants={fadeInUp} className="mb-20">
         <motion.div 
           variants={staggerContainer}
           className="flex justify-between items-center mb-8"
@@ -313,9 +289,9 @@ const ServiceCategoriesPage = () => {
         </motion.div>
         <motion.div 
           variants={staggerContainer}
-          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"
+          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6"
         >
-          {categories.map((category) => (
+          {categories.slice(0, 4).map((category) => (
             <motion.button
               variants={scaleIn}
               whileHover={{ scale: 1.03 }}
@@ -335,21 +311,15 @@ const ServiceCategoriesPage = () => {
                     e.target.src = defaultImage;
                   }}
                 />
-                <div className="absolute top-3 left-3 flex gap-2">
-                  {category.isPopular && (
-                    <motion.span 
-                      initial={{ opacity: 0, scale: 0.8 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      className="bg-yellow-400 text-yellow-900 px-3 py-1 rounded-full text-xs font-bold shadow-lg"
-                    >
+                {category.isPopular && (
+                  <div className="absolute top-3 left-3 flex gap-2">
+                    <span className="bg-yellow-400 text-yellow-900 px-3 py-1 rounded-full text-xs font-bold shadow-lg">
                       Popular
-                    </motion.span>
-                  )}
-                </div>
+                    </span>
+                  </div>
+                )}
               </div>
-              <motion.div 
-                className="p-5 transform transition-transform duration-300 group-hover:translate-y-[-4px]"
-              >
+              <div className="p-5">
                 <h3 className="text-xl font-semibold text-gray-800 mb-2 group-hover:text-blue-600 transition-colors duration-300">
                   {category.name}
                 </h3>
@@ -357,7 +327,7 @@ const ServiceCategoriesPage = () => {
                   Browse professionals
                   <FaArrowRight className="transform group-hover:translate-x-1 transition-transform duration-300" />
                 </p>
-              </motion.div>
+              </div>
             </motion.button>
           ))}
         </motion.div>
@@ -386,8 +356,7 @@ const ServiceCategoriesPage = () => {
             },
             {
               title: "View Professionals",
-              description:
-                "See available professionals with profiles and reviews",
+              description: "See available professionals with profiles and reviews",
               icon: <FaUserTie className="text-2xl" />,
             },
             {
@@ -402,13 +371,9 @@ const ServiceCategoriesPage = () => {
               whileHover={{ scale: 1.05, y: -5 }}
               className="bg-white rounded-xl p-6 shadow-md hover:shadow-xl transition-all duration-500 transform"
             >
-              <motion.div 
-                whileHover={{ rotate: 360 }}
-                transition={{ duration: 0.7 }}
-                className="w-16 h-16 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg"
-              >
+              <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg">
                 <span className="text-white">{step.icon}</span>
-              </motion.div>
+              </div>
               <h3 className="text-xl font-semibold mb-2 text-center text-gray-800">
                 {step.title}
               </h3>
@@ -433,8 +398,7 @@ const ServiceCategoriesPage = () => {
           variants={fadeInUp}
           className="text-xl opacity-90 mb-8 max-w-2xl mx-auto leading-relaxed"
         >
-          Join thousands of satisfied customers who found their perfect service
-          professional
+          Join thousands of satisfied customers who found their perfect service professional
         </motion.p>
         <motion.div 
           variants={staggerContainer}
