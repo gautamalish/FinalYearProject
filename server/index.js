@@ -165,7 +165,12 @@ app.put(
       const { firebaseUID } = req.user;
       const { name, email, phone, hourlyRate } = req.body;
 
-      console.log("Profile update request:", { name, email, phone, hourlyRate });
+      console.log("Profile update request:", {
+        name,
+        email,
+        phone,
+        hourlyRate,
+      });
 
       // Prepare update data
       const updateData = { name, email, phone };
@@ -192,7 +197,7 @@ app.put(
         }
 
         let workerData = null;
-        
+
         // If user is a worker and hourlyRate is provided, update the Worker document
         if (updatedUser.role === "worker" && hourlyRate !== undefined) {
           // Ensure hourlyRate is a valid positive number
@@ -219,7 +224,10 @@ app.put(
             { session }
           );
 
-          console.log("Updated worker hourly rate in both collections:", parsedHourlyRate);
+          console.log(
+            "Updated worker hourly rate in both collections:",
+            parsedHourlyRate
+          );
         }
 
         await session.commitTransaction();
@@ -227,7 +235,7 @@ app.put(
         // Combine user and worker data for response
         const responseData = {
           ...updatedUser.toObject(),
-          hourlyRate: workerData?.hourlyRate
+          hourlyRate: workerData?.hourlyRate,
         };
 
         res.status(200).json(responseData);
@@ -239,7 +247,9 @@ app.put(
       }
     } catch (error) {
       console.error("Profile update error:", error);
-      res.status(400).json({ error: error.message || "Failed to update profile" });
+      res
+        .status(400)
+        .json({ error: error.message || "Failed to update profile" });
     }
   }
 );
@@ -699,8 +709,22 @@ app.post(
 
     try {
       // Validate required fields
-      const { phone, nationality, residence, category, hourlyRate, experience } = req.body;
-      if (!phone || !nationality || !residence || !category || !hourlyRate || !experience) {
+      const {
+        phone,
+        nationality,
+        residence,
+        category,
+        hourlyRate,
+        experience,
+      } = req.body;
+      if (
+        !phone ||
+        !nationality ||
+        !residence ||
+        !category ||
+        !hourlyRate ||
+        !experience
+      ) {
         return res
           .status(400)
           .json({ message: "Please fill in all required fields" });
@@ -711,7 +735,9 @@ app.post(
       // Ensure hourlyRate is a valid positive number
       const parsedHourlyRate = parseFloat(hourlyRate);
       if (isNaN(parsedHourlyRate) || parsedHourlyRate < 0) {
-        return res.status(400).json({ message: "Hourly rate must be a valid positive number" });
+        return res
+          .status(400)
+          .json({ message: "Hourly rate must be a valid positive number" });
       }
 
       // Find user by firebaseUID
@@ -754,13 +780,13 @@ app.post(
             thursday: false,
             friday: false,
             saturday: false,
-            sunday: false
+            sunday: false,
           },
           hours: {
             start: "09:00",
-            end: "17:00"
-          }
-        }
+            end: "17:00",
+          },
+        },
       };
 
       // Create new worker document
@@ -782,7 +808,7 @@ app.post(
       await session.commitTransaction();
       res.status(201).json({
         message: "Successfully registered as worker",
-        worker: newWorker
+        worker: newWorker,
       });
     } catch (error) {
       await session.abortTransaction();

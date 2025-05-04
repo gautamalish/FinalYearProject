@@ -10,15 +10,7 @@ const paymentSchema = new mongoose.Schema({
     type: Number,
     required: true
   },
-  serviceFee: {
-    type: Number,
-    default: 0
-  },
   transactionId: {
-    type: String,
-    required: true
-  },
-  khaltiToken: {
     type: String,
     required: true
   },
@@ -29,7 +21,8 @@ const paymentSchema = new mongoose.Schema({
   },
   paymentMethod: {
     type: String,
-    default: 'khalti'
+    enum: ['stripe', 'khalti', 'other'],
+    default: 'stripe'
   },
   paymentDate: {
     type: Date,

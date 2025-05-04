@@ -34,15 +34,15 @@ const handleApiError = (error) => {
 };
 
 /**
- * Initiates a payment for a completed job
+ * Gets payment details for a job
  * @param {string} jobId - The ID of the job to pay for
  * @param {string} token - Firebase auth token
  * @returns {Promise<Object>} Payment details including amount and service fee
  */
-export const initiatePayment = async (jobId, token) => {
+export const getPaymentDetails = async (jobId, token) => {
   try {
     const response = await axios.get(
-      `${PAYMENT_ENDPOINT}/initiate/${jobId}`,
+      `${PAYMENT_ENDPOINT}/details/${jobId}`,
       getAuthConfig(token)
     );
     return response.data;
@@ -52,29 +52,43 @@ export const initiatePayment = async (jobId, token) => {
 };
 
 /**
- * Verifies a payment with Khalti
- * @param {string} jobId - The ID of the job being paid for
- * @param {string} khaltiToken - Token received from Khalti after payment
- * @param {number} amount - Payment amount in paisa (Khalti uses paisa)
+ * Creates a payment intent with Stripe
+ * @param {string} jobId - The ID of the job to pay for
+ * @param {number} amount - Payment amount in cents
+ * @param {string} currency - Currency code (default: 'usd')
  * @param {string} token - Firebase auth token
- * @returns {Promise<Object>} Payment verification result
+ * @returns {Promise<Object>} Payment intent details including client secret
  */
-export const verifyPayment = async (jobId, khaltiToken, amount, token) => {
+export const createPaymentIntent = async (jobId, amount, currency = 'usd', token) => {
   try {
-    console.log('Verifying payment with:', { 
-      jobId, 
-      amount, 
-      token: khaltiToken.substring(0, 10) + '...' 
-    });
-
     const response = await axios.post(
-      `${PAYMENT_ENDPOINT}/verify`,
-      { jobId, token: khaltiToken, amount },
+      `${PAYMENT_ENDPOINT}/create-payment-intent`,
+      { jobId, amount, currency },
       getAuthConfig(token)
     );
     return response.data;
   } catch (error) {
-    console.error('Full verification error:', error);
+    handleApiError(error);
+  }
+};
+
+/**
+ * Confirms a successful payment with Stripe
+ * @param {string} paymentIntentId - The ID of the Stripe payment intent
+ * @param {string} jobId - The ID of the job being paid for
+ * @param {string} token - Firebase auth token
+ * @returns {Promise<Object>} Payment confirmation result
+ */
+export const confirmPayment = async (paymentIntentId, jobId, token) => {
+  try {
+    const response = await axios.post(
+      `${PAYMENT_ENDPOINT}/confirm-payment`,
+      { paymentIntentId, jobId },
+      getAuthConfig(token)
+    );
+    return response.data;
+  } catch (error) {
+    console.error('Payment confirmation error:', error);
     if (error.response) {
       console.error('Response data:', error.response.data);
     }
@@ -100,12 +114,12 @@ export const getPaymentHistory = async (token) => {
 };
 
 /**
- * Gets details for a specific payment
+ * Gets details for a specific payment by ID
  * @param {string} paymentId - The ID of the payment
  * @param {string} token - Firebase auth token
  * @returns {Promise<Object>} Payment details
  */
-export const getPaymentDetails = async (paymentId, token) => {
+export const getPaymentById = async (paymentId, token) => {
   try {
     const response = await axios.get(
       `${PAYMENT_ENDPOINT}/${paymentId}`,

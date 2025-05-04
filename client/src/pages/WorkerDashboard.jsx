@@ -138,6 +138,17 @@ const WorkerDashboard = () => {
                       <FaClock className="text-blue-500 mr-2" />
                       <span>{job.time}</span>
                     </div>
+                    {job.status === 'completed' && (
+                      <div className="mt-2 p-2 rounded-md bg-gray-50">
+                        <div className="font-medium text-gray-700">Payment Status:</div>
+                        <div className={`flex items-center justify-between ${job.paymentStatus === 'paid' ? 'text-green-600' : 'text-orange-600'}`}>
+                          <span>{job.paymentStatus === 'paid' ? 'Paid' : 'Payment Pending'}</span>
+                          {job.paymentStatus === 'pending' && job.totalAmount && (
+                            <span className="font-semibold">Rs. {job.totalAmount}</span>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   <div className="mt-6 space-y-3">

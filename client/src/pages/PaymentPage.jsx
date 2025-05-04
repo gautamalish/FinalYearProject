@@ -1,132 +1,138 @@
-import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
-import axios from 'axios';
-import { FaDollarSign, FaUser, FaCalendarAlt, FaClock } from 'react-icons/fa';
-import KhaltiCheckout from 'khalti-checkout-web';
+import React, { useState, useEffect } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import { useAuth } from "../contexts/AuthContext";
+import axios from "axios";
+import { createPaymentIntent, confirmPayment, getPaymentDetails } from "../services/payment";
+import { loadStripe } from "@stripe/stripe-js";
+import {
+  FaArrowLeft,
+  FaMapMarkerAlt,
+  FaCalendarAlt,
+  FaClock,
+  FaUser,
+  FaDollarSign,
+  FaCreditCard,
+  FaSpinner,
+} from "react-icons/fa";
 
 const PaymentPage = () => {
   const { jobId } = useParams();
   const navigate = useNavigate();
-  const { currentUser } = useAuth();
+  const { currentUser, mongoUser } = useAuth();
   const [job, setJob] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [processing, setProcessing] = useState(false);
+  const [error, setError] = useState("");
   const [paymentSuccess, setPaymentSuccess] = useState(false);
+  const [stripe, setStripe] = useState(null);
+  const [processingPayment, setProcessingPayment] = useState(false);
+
+  // Load Stripe when component mounts
+  useEffect(() => {
+    const initializeStripe = async () => {
+      try {
+        const stripeInstance = await loadStripe(
+          import.meta.env.VITE_STRIPE_PUBLIC_KEY
+        );
+        setStripe(stripeInstance);
+      } catch (err) {
+        console.error("Failed to load Stripe:", err);
+        setError("Failed to initialize payment system");
+      }
+    };
+
+    initializeStripe();
+  }, []);
 
   useEffect(() => {
-    const fetchJobDetails = async () => {
-      if (!currentUser) {
-        navigate('/signin');
-        return;
-      }
+    // Redirect if not logged in or not a client
+    if (!currentUser || mongoUser?.role !== "client") {
+      navigate("/");
+      return;
+    }
 
+    const fetchJobDetails = async () => {
       try {
+        setLoading(true);
         const token = await currentUser.getIdToken();
         const response = await axios.get(`/api/jobs/${jobId}`, {
-          headers: { Authorization: `Bearer ${token}` }
+          headers: { Authorization: `Bearer ${token}` },
         });
-        
-        // Redirect if job is not completed or payment is not pending
-        if (response.data.status !== 'completed' || response.data.paymentStatus !== 'pending') {
-          navigate('/dashboard');
-          return;
+
+        setJob(response.data);
+
+        // Redirect if job is not completed or already paid
+        if (
+          response.data.status !== "completed" ||
+          response.data.paymentStatus !== "pending"
+        ) {
+          navigate("/client-dashboard");
         }
-
-        // Calculate duration and total amount
-        const startTime = new Date(response.data.startTime);
-        const endTime = new Date(response.data.endTime);
-        const totalDurationHours = (endTime - startTime) / (1000 * 60 * 60); // Convert milliseconds to hours
-        const hourlyRate = response.data.hourlyRate || 0;
-        
-        // Calculate total amount using the same method as server
-        const totalAmount = hourlyRate * parseFloat(totalDurationHours.toFixed(2));
-
-        // Calculate duration in hours and minutes for display
-        const durationMinutes = Math.round(totalDurationHours * 60); // Convert hours to minutes
-        const displayHours = Math.floor(durationMinutes / 60);
-        const remainingMinutes = durationMinutes % 60;
-        const durationDisplay = displayHours > 0 
-          ? `${displayHours} hour${displayHours > 1 ? 's' : ''} ${remainingMinutes > 0 ? `${remainingMinutes} minutes` : ''}` 
-          : `${remainingMinutes} minutes`;
-
-        setJob({
-          ...response.data,
-          duration: durationDisplay,
-          durationMinutes,
-          totalAmount: totalAmount
-        });
       } catch (err) {
-        console.error('Error fetching job details:', err);
-        setError(err.response?.data?.message || 'Failed to load job details');
+        console.error("Error fetching job details:", err);
+        setError(err.response?.data?.message || "Failed to load job details");
       } finally {
         setLoading(false);
       }
     };
 
     fetchJobDetails();
-  }, [jobId, currentUser, navigate]);
+  }, [currentUser, mongoUser, jobId, navigate]);
 
   const handlePayment = async () => {
-    if (!job || processing) return;
+    if (!stripe || !job) return;
+
+    setProcessingPayment(true);
+    setError("");
 
     try {
-      setProcessing(true);
-      setError('');
+      const token = await currentUser.getIdToken();
 
-      // Calculate total amount (amount in paisa - Khalti requirement)
-      const amountInPaisa = Math.round(job.totalAmount * 100);
+      // Get payment details first
+      const paymentDetails = await getPaymentDetails(job._id, token);
+      
+      // Step 1: Create payment intent on your backend
+      const paymentIntentResponse = await createPaymentIntent(
+        job._id,
+        Math.round(paymentDetails.totalAmount * 100), // Convert to cents
+        "usd", // or your preferred currency
+        token
+      );
 
-      // Configure Khalti
-      let config = {
-        publicKey: import.meta.env.VITE_KHALTI_PUBLIC_KEY,
-        productIdentity: jobId,
-        productName: job.title || 'Service Payment',
-        productUrl: window.location.href,
-        eventHandler: {
-          onSuccess: async (payload) => {
-            try {
-              // Verify payment with our backend
-              const token = await currentUser.getIdToken();
-              await axios.post(`/api/payments/verify/${jobId}`, {
-                token: payload.token,
-                amount: amountInPaisa
-              }, {
-                headers: { Authorization: `Bearer ${token}` }
-              });
+      const { clientSecret, paymentIntentId } = paymentIntentResponse;
 
-              setPaymentSuccess(true);
-              
-              // Redirect to dashboard after 3 seconds
-              setTimeout(() => {
-                navigate('/dashboard');
-              }, 3000);
-            } catch (error) {
-              console.error('Payment verification error:', error);
-              setError('Payment verification failed. Please contact support.');
-              setProcessing(false);
-            }
+      // Step 2: Use Stripe Elements to collect payment method and confirm payment
+      const { error, paymentIntent } = await stripe.confirmCardPayment(clientSecret, {
+        payment_method: {
+          card: {
+            token: 'tok_visa', // Use a test token for development
           },
-          onError: (error) => {
-            console.error('Khalti payment error:', error);
-            setError('Payment failed. Please try again.');
-            setProcessing(false);
+          billing_details: {
+            name: currentUser.displayName || 'Customer',
+            email: currentUser.email,
           },
-          onClose: () => {
-            setProcessing(false);
-          }
         },
-        amount: amountInPaisa
-      };
+      });
 
-      const checkout = new KhaltiCheckout(config);
-      checkout.show({ popUp: false });
+      if (error) {
+        throw error;
+      }
 
+      // Step 3: Confirm the payment with our backend
+      await confirmPayment(paymentIntentId, job._id, token);
+
+      // If we get here, payment was successful
+      setPaymentSuccess(true);
+      setJob((prev) => ({ ...prev, paymentStatus: "paid" }));
+
+      // Redirect after 3 seconds
+      setTimeout(() => {
+        navigate("/client-dashboard");
+      }, 3000);
     } catch (err) {
-      console.error('Payment processing error:', err);
-      setError(err.response?.data?.message || 'Payment processing failed');
-      setProcessing(false);
+      console.error("Payment error:", err);
+      setError(err.message || "Payment processing failed");
+    } finally {
+      setProcessingPayment(false);
     }
   };
 
@@ -144,25 +150,31 @@ const PaymentPage = () => {
         <div className="max-w-2xl mx-auto bg-white rounded-xl shadow-md p-6">
           <div className="text-center text-red-600">
             <p>{error}</p>
+            <button
+              onClick={() => navigate("/client-dashboard")}
+              className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+            >
+              Back to Dashboard
+            </button>
           </div>
         </div>
       </div>
     );
   }
 
-  if (paymentSuccess) {
+  if (!job) {
     return (
-      <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8 flex items-center justify-center">
-        <div className="max-w-md w-full bg-white rounded-xl shadow-md overflow-hidden p-8 text-center">
-          <div className="rounded-full bg-green-100 p-4 mx-auto w-20 h-20 flex items-center justify-center mb-4">
-            <svg className="w-10 h-10 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
-            </svg>
+      <div className="min-h-screen bg-gray-50 p-6">
+        <div className="max-w-2xl mx-auto bg-white rounded-xl shadow-md p-6">
+          <div className="text-center text-gray-600">
+            <p>Job not found</p>
+            <button
+              onClick={() => navigate("/client-dashboard")}
+              className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+            >
+              Back to Dashboard
+            </button>
           </div>
-          <h2 className="text-2xl font-bold text-gray-800 mb-2">Payment Successful!</h2>
-          <p className="text-gray-600 mb-6">
-            Thank you for your payment. You will be redirected to your dashboard shortly.
-          </p>
         </div>
       </div>
     );
@@ -170,84 +182,125 @@ const PaymentPage = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-2xl mx-auto">
+      <div className="max-w-3xl mx-auto">
+        {/* Back button */}
+        <button
+          onClick={() => navigate("/client-dashboard")}
+          className="mb-6 flex items-center text-blue-600 hover:text-blue-800 transition-colors"
+        >
+          <FaArrowLeft className="mr-2" />
+          Back to Dashboard
+        </button>
+
+        {/* Payment success message */}
+        {paymentSuccess && (
+          <div
+            className="mb-6 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative"
+            role="alert"
+          >
+            <strong className="font-bold">Success!</strong>
+            <span className="block sm:inline">
+              {" "}
+              Payment completed successfully. Redirecting to dashboard...
+            </span>
+          </div>
+        )}
+
         <div className="bg-white rounded-xl shadow-md overflow-hidden">
-          <div className="bg-blue-600 px-4 py-5 text-white text-center">
-            <h1 className="text-2xl font-bold">Payment Details</h1>
+          {/* Header */}
+          <div className="bg-blue-600 px-6 py-4 text-white">
+            <h1 className="text-2xl font-bold">Payment for Service</h1>
           </div>
 
+          {/* Job details */}
           <div className="p-6">
-            {job && (
-              <div className="space-y-6">
-                <div className="flex items-center justify-between pb-4 border-b border-gray-200">
-                  <div className="flex items-center">
-                    <FaUser className="text-blue-500 mr-2" />
-                    <span className="text-gray-600">Service Provider</span>
-                  </div>
-                  <span className="font-semibold">{job.worker?.name}</span>
-                </div>
+            <h2 className="text-xl font-semibold text-gray-800 mb-4">
+              {job.title}
+            </h2>
 
-                <div className="flex items-center justify-between pb-4 border-b border-gray-200">
-                  <div className="flex items-center">
-                    <FaCalendarAlt className="text-blue-500 mr-2" />
-                    <span className="text-gray-600">Service Date</span>
-                  </div>
-                  <span className="font-semibold">{job.date}</span>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+              <div className="space-y-3">
+                <div className="flex items-center text-gray-600">
+                  <FaUser className="text-blue-500 mr-2" />
+                  <span>Worker: {job.worker?.name}</span>
                 </div>
+                <div className="flex items-center text-gray-600">
+                  <FaMapMarkerAlt className="text-blue-500 mr-2" />
+                  <span>Location: {job.location}</span>
+                </div>
+                <div className="flex items-center text-gray-600">
+                  <FaCalendarAlt className="text-blue-500 mr-2" />
+                  <span>Date: {job.date}</span>
+                </div>
+                <div className="flex items-center text-gray-600">
+                  <FaClock className="text-blue-500 mr-2" />
+                  <span>Time: {job.time}</span>
+                </div>
+              </div>
 
-                <div className="flex items-center justify-between pb-4 border-b border-gray-200">
-                  <div className="flex items-center">
+              <div className="space-y-3">
+                <div className="flex items-center text-gray-600">
+                  <FaDollarSign className="text-blue-500 mr-2" />
+                  <span>Hourly Rate: Rs. {job.hourlyRate}</span>
+                </div>
+                {job.duration && (
+                  <div className="flex items-center text-gray-600">
                     <FaClock className="text-blue-500 mr-2" />
-                    <span className="text-gray-600">Service Time</span>
+                    <span>Duration: {job.duration} hour(s)</span>
                   </div>
-                  <span className="font-semibold">{job.time}</span>
-                </div>
-
-                <div className="flex items-center justify-between pb-4 border-b border-gray-200">
-                  <div className="flex items-center">
-                    <FaDollarSign className="text-blue-500 mr-2" />
-                    <span className="text-gray-600">Hourly Rate</span>
-                  </div>
-                  <span className="font-semibold">Rs. {job.hourlyRate}/hr</span>
-                </div>
-
-                <div className="flex items-center justify-between pb-4 border-b border-gray-200">
-                  <div className="flex items-center">
-                    <FaClock className="text-blue-500 mr-2" />
-                    <span className="text-gray-600">Duration</span>
-                  </div>
-                  <span className="font-semibold">{job.duration}</span>
-                </div>
-
-                <div className="flex items-center justify-between pb-4 border-b border-gray-200">
-                  <div className="flex items-center">
-                    <FaDollarSign className="text-blue-500 mr-2" />
-                    <span className="text-gray-600">Total Amount</span>
-                  </div>
-                  <span className="font-semibold text-lg text-blue-600">
-                    Rs. {job.totalAmount.toFixed(2)}
+                )}
+                <div className="flex items-center text-gray-600 font-semibold">
+                  <FaDollarSign className="text-blue-500 mr-2" />
+                  <span>
+                    Total Amount: Rs.{" "}
+                    {job.totalAmount || job.hourlyRate * (job.duration || 1)}
                   </span>
                 </div>
+              </div>
+            </div>
 
-                <div className="flex items-center justify-between pb-4 border-b border-gray-200">
-                  <div className="flex items-center">
-                    <FaDollarSign className="text-blue-500 mr-2" />
-                    <span className="text-gray-600">Amount to Pay</span>
-                  </div>
-                  <span className="text-xl font-bold text-green-600">Rs. {job.totalAmount}</span>
-                </div>
+            <div className="border-t border-gray-200 pt-6">
+              <h3 className="text-lg font-semibold text-gray-800 mb-4">
+                Complete Your Payment
+              </h3>
+              <p className="text-gray-600 mb-6">
+                Please complete the payment to finalize this service. The
+                payment will be securely processed through Stripe.
+              </p>
 
+              {/* Payment button */}
+              <div className="mt-4">
                 <button
                   onClick={handlePayment}
-                  disabled={processing}
-                  className={`w-full px-6 py-3 text-white rounded-lg flex items-center justify-center space-x-2 ${processing ? 'bg-gray-400 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700'}`}
+                  disabled={processingPayment || paymentSuccess || !stripe}
+                  className={`w-full px-4 py-3 rounded-md flex items-center justify-center transition-colors ${
+                    paymentSuccess
+                      ? "bg-green-100 text-green-800 cursor-not-allowed"
+                      : "bg-blue-600 text-white hover:bg-blue-700"
+                  }`}
                 >
-                  <span className="text-lg font-semibold">
-                    {processing ? 'Processing...' : 'Pay Now'}
-                  </span>
+                  {processingPayment ? (
+                    <>
+                      <FaSpinner className="animate-spin mr-2" />
+                      Processing...
+                    </>
+                  ) : paymentSuccess ? (
+                    "Payment Completed"
+                  ) : (
+                    <>
+                      <FaCreditCard className="mr-2" />
+                      Pay with Stripe
+                    </>
+                  )}
                 </button>
               </div>
-            )}
+
+              {error && (
+                <div className="mt-4 p-2 bg-red-50 text-red-600 text-sm rounded">
+                  {error}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>

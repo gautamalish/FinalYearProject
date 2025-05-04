@@ -1,272 +1,221 @@
-const Payment = require('../models/PaymentModel');
-const Job = require('../models/JobModel');
-const User = require('../models/UserModel');
-const Worker = require('../models/WorkerModel');
-const { createNotification } = require('./notificationController');
-const axios = require('axios');
-require('dotenv').config();
+const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
+const Job = require("../models/JobModel");
+const Payment = require("../models/PaymentModel");
+const User = require("../models/UserModel");
+const Worker = require("../models/WorkerModel");
 
-// Khalti API configuration
-const IS_SANDBOX = process.env.NODE_ENV === 'development';
-const KHALTI_VERIFY_URL = "https://dev.khalti.com/api/v2/payment/verify/";
-
-const KHALTI_SECRET_KEY = process.env.KHALTI_SECRET_KEY;
-if (!KHALTI_SECRET_KEY) {
-  throw new Error('Khalti secret key not configured');
-}
-
-// Initiate a payment for a completed job
-exports.initiatePayment = async (req, res) => {
+/**
+ * Create a payment intent for Stripe checkout
+ */
+exports.createPaymentIntent = async (req, res) => {
   try {
-    const { jobId } = req.params;
-    
+    const { jobId, amount, currency = "usd" } = req.body;
+    const { firebaseUID } = req.user;
+
+    // Validate request
+    if (!jobId || !amount) {
+      return res.status(400).json({ error: "Job ID and amount are required" });
+    }
+
     // Find the job
     const job = await Job.findById(jobId)
-      .populate('worker')
-      .populate('client');
-    
+      .populate("worker", "name")
+      .populate("client", "firebaseUID");
+
     if (!job) {
-      return res.status(404).json({ message: 'Job not found' });
+      return res.status(404).json({ error: "Job not found" });
     }
-    
-    // Check if the user is the client for this job
-    const userId = req.user._id;
-    
-    if (job.client._id.toString() !== userId.toString()) {
-      return res.status(403).json({ message: 'Unauthorized: Only the client can make payment for this job' });
+
+    // Verify the client is the one making the payment
+    const client = await User.findOne({ firebaseUID });
+    if (!client || job.client.firebaseUID !== firebaseUID) {
+      return res.status(403).json({ error: "Unauthorized to make this payment" });
     }
-    
-    // Check if job is completed
-    if (job.status !== 'completed') {
-      return res.status(400).json({ message: 'Payment can only be made for completed jobs' });
+
+    // Verify job is completed and payment is pending
+    if (job.status !== "completed") {
+      return res.status(400).json({ error: "Job must be completed before payment" });
     }
-    
-    // Check if payment is already made
-    if (job.paymentStatus === 'paid') {
-      return res.status(400).json({ message: 'Payment has already been made for this job' });
+
+    if (job.paymentStatus !== "pending") {
+      return res.status(400).json({ error: "Payment has already been processed" });
     }
-    
-    // Calculate service fee (10% of job price)
-    const serviceFee = Math.round(job.price * 0.1);
-    const totalAmount = job.price + serviceFee;
-    
-    // Return payment details to client
-    res.status(200).json({
-      jobId: job._id,
-      amount: job.price,
-      serviceFee,
-      totalAmount,
-      workerName: job.worker.name,
-      clientName: job.clientName,
-      jobTitle: job.title,
-      jobDate: job.date,
-      jobTime: job.time
+
+    // Create a payment intent with Stripe
+    const paymentIntent = await stripe.paymentIntents.create({
+      amount: Math.round(amount), // Stripe requires amount in cents
+      currency,
+      metadata: { 
+        jobId: job._id.toString(),
+        clientId: client._id.toString(),
+        workerId: job.worker._id.toString()
+      },
+      description: `Payment for job: ${job.title}`
     });
-  } catch (error) {
-    console.error('Error initiating payment:', error);
-    res.status(500).json({ message: 'Failed to initiate payment' });
+
+    res.json({ 
+      clientSecret: paymentIntent.client_secret,
+      paymentIntentId: paymentIntent.id
+    });
+  } catch (err) {
+    console.error("Error creating payment intent:", err);
+    res.status(500).json({ error: err.message });
   }
 };
 
-// Verify payment from Khalti
-exports.verifyPayment = async (req, res) => {
+/**
+ * Confirm a successful payment and update job status
+ */
+exports.confirmPayment = async (req, res) => {
   try {
-    const { jobId, khaltiToken, amount } = req.body;
-    
-    // Validate input more thoroughly
-    if (!jobId || !khaltiToken || !amount) {
-      return res.status(400).json({ 
-        message: 'Missing required fields',
-        details: {
-          jobId: !jobId ? 'Missing' : 'Provided',
-          khaltiToken: !khaltiToken ? 'Missing' : 'Provided',
-          amount: !amount ? 'Missing' : 'Provided'
-        }
-      });
+    const { paymentIntentId, jobId } = req.body;
+    const { firebaseUID } = req.user;
+
+    // Validate request
+    if (!paymentIntentId || !jobId) {
+      return res.status(400).json({ error: "Payment intent ID and job ID are required" });
     }
 
-    const job = await Job.findById(jobId)
-      .populate('worker')
-      .populate('client');
+    // Retrieve the payment intent from Stripe
+    const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
     
+    if (!paymentIntent) {
+      return res.status(404).json({ error: "Payment intent not found" });
+    }
+
+    if (paymentIntent.status !== "succeeded") {
+      return res.status(400).json({ error: `Payment not successful. Status: ${paymentIntent.status}` });
+    }
+
+    // Find the job
+    const job = await Job.findById(jobId);
     if (!job) {
-      return res.status(404).json({ message: 'Job not found' });
-    }
-    
-    // Authorization check
-    if (job.client._id.toString() !== req.user._id.toString()) {
-      return res.status(403).json({ message: 'Unauthorized' });
-    }
-    
-    // Validate amount matches job price + fee
-    const expectedAmount = Math.round(job.price * 1.1 * 100); // in paisa
-    if (amount !== expectedAmount) {
-      return res.status(400).json({ 
-        message: 'Amount mismatch',
-        details: {
-          expected: expectedAmount,
-          received: amount
-        }
-      });
+      return res.status(404).json({ error: "Job not found" });
     }
 
-    // Verify with Khalti
-    const response = await axios.post(
-      KHALTI_VERIFY_URL,
-      { token: khaltiToken, amount },
-      {
-        headers: {
-          'Authorization': `Key ${KHALTI_SECRET_KEY}`,
-          'Content-Type': 'application/json'
-        },
-        timeout: 10000 // 10 second timeout
-      }
-    );
-    
-    // Check successful verification
-    if (!response.data?.idx) {
-      return res.status(400).json({ 
-        message: 'Payment verification failed',
-        khaltiResponse: response.data
-      });
+    // Verify the client is the one confirming the payment
+    const client = await User.findOne({ firebaseUID });
+    if (!client || job.client.toString() !== client._id.toString()) {
+      return res.status(403).json({ error: "Unauthorized to confirm this payment" });
     }
+
+    // Update job payment status
+    job.paymentStatus = "paid";
+    await job.save();
 
     // Create payment record
-    const serviceFee = Math.round(job.price * 0.1);
     const payment = new Payment({
       job: job._id,
-      amount: job.price,
-      serviceFee,
-      transactionId: response.data.idx,
-      khaltiToken,
-      status: 'completed',
-      client: job.client._id,
-      worker: job.worker._id,
-      metadata: response.data,
-      paymentMethod: 'khalti',
-      paymentGateway: IS_SANDBOX ? 'khalti-sandbox' : 'khalti'
+      amount: paymentIntent.amount / 100, // Convert from cents
+      transactionId: paymentIntent.id,
+      status: "completed",
+      paymentMethod: "stripe",
+      client: client._id,
+      worker: job.worker,
+      metadata: paymentIntent.metadata
     });
 
     await payment.save();
-    
-    // Update job status in a transaction
-    const session = await mongoose.startSession();
-    session.startTransaction();
-    
-    try {
-      job.paymentStatus = 'paid';
-      await job.save({ session });
-      
-      // Add funds to worker's account if applicable
-      await Worker.findByIdAndUpdate(
-        job.worker._id,
-        { $inc: { earnings: job.price } },
-        { session }
-      );
-      
-      await session.commitTransaction();
-      
-      // Create notifications
-      await createNotification(
-        job.worker.user,
-        `Payment of Rs.${job.price} received for job: ${job.title}`,
-        'payment_received',
-        job._id
-      );
-      
-      await createNotification(
-        job.client._id,
-        `Payment of Rs.${job.price} processed for job: ${job.title}`,
-        'payment_made',
-        job._id
-      );
-      
-      return res.status(200).json({
-        message: 'Payment successful',
-        paymentId: payment._id,
-        transactionId: response.data.idx,
-        amount: job.price
-      });
-      
-    } catch (transactionError) {
-      await session.abortTransaction();
-      throw transactionError;
-    } finally {
-      session.endSession();
-    }
-    
-  } catch (error) {
-    console.error('Payment verification error:', error);
-    
-    const statusCode = error.response?.status || 500;
-    const errorMessage = error.response?.data 
-      ? `Khalti error: ${JSON.stringify(error.response.data)}`
-      : error.message;
-    
-    res.status(statusCode).json({ 
-      message: 'Payment processing failed',
-      error: errorMessage
+
+    res.json({ 
+      success: true, 
+      message: "Payment confirmed successfully",
+      payment: {
+        id: payment._id,
+        amount: payment.amount,
+        status: payment.status,
+        paymentMethod: payment.paymentMethod,
+        paymentDate: payment.paymentDate
+      }
     });
+  } catch (err) {
+    console.error("Error confirming payment:", err);
+    res.status(500).json({ error: err.message });
   }
 };
 
-// Get payment history for a user
-exports.getPaymentHistory = async (req, res) => {
-  try {
-    const userId = req.user._id;
-    
-    // Find payments where user is either client or worker
-    const payments = await Payment.find({
-      $or: [
-        { client: userId },
-        { worker: userId }
-      ]
-    })
-    .populate({
-      path: 'job',
-      populate: [
-        { path: 'worker' },
-        { path: 'client' }
-      ]
-    })
-    .sort({ paymentDate: -1 });
-    
-    res.status(200).json(payments);
-  } catch (error) {
-    console.error('Error fetching payment history:', error);
-    res.status(500).json({ message: 'Failed to fetch payment history' });
-  }
-};
-
-// Get payment details
+/**
+ * Get payment details for a job
+ */
 exports.getPaymentDetails = async (req, res) => {
   try {
-    const { paymentId } = req.params;
-    
-    const payment = await Payment.findById(paymentId)
-      .populate({
-        path: 'job',
-        populate: [
-          { path: 'worker' },
-          { path: 'client' }
-        ]
-      });
-    
-    if (!payment) {
-      return res.status(404).json({ message: 'Payment not found' });
+    const { jobId } = req.params;
+    const { firebaseUID } = req.user;
+
+    // Find the job
+    const job = await Job.findById(jobId)
+      .populate("worker", "name hourlyRate")
+      .populate("client", "firebaseUID name");
+
+    if (!job) {
+      return res.status(404).json({ error: "Job not found" });
     }
-    
-    // Check if the user is authorized to view this payment
-    const userId = req.user._id;
-    
-    if (payment.client.toString() !== userId.toString() && 
-        payment.job.worker.user.toString() !== userId.toString()) {
-      return res.status(403).json({ message: 'Unauthorized: You do not have permission to view this payment' });
+
+    // Verify the user is either the client or worker
+    const user = await User.findOne({ firebaseUID });
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
     }
-    
-    res.status(200).json(payment);
-  } catch (error) {
-    console.error('Error fetching payment details:', error);
-    res.status(500).json({ message: 'Failed to fetch payment details' });
+
+    const isClient = job.client._id.toString() === user._id.toString();
+    const isWorker = job.worker._id.toString() === user._id.toString();
+
+    if (!isClient && !isWorker) {
+      return res.status(403).json({ error: "Unauthorized to view payment details" });
+    }
+
+    // Calculate payment details
+    const amount = job.totalAmount || (job.hourlyRate * (job.duration || 1));
+    const serviceFee = amount * 0.10; // 10% service fee
+    const totalAmount = amount + serviceFee;
+
+    res.json({
+      jobId: job._id,
+      title: job.title,
+      workerName: job.worker.name,
+      clientName: job.client.name,
+      amount,
+      serviceFee,
+      totalAmount,
+      paymentStatus: job.paymentStatus,
+      currency: "usd"
+    });
+  } catch (err) {
+    console.error("Error getting payment details:", err);
+    res.status(500).json({ error: err.message });
+  }
+};
+
+/**
+ * Get payment history for the current user
+ */
+exports.getPaymentHistory = async (req, res) => {
+  try {
+    const { firebaseUID } = req.user;
+    const user = await User.findOne({ firebaseUID });
+
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    let payments;
+    if (user.role === "client") {
+      payments = await Payment.find({ client: user._id })
+        .populate("job", "title date time")
+        .populate("worker", "name")
+        .sort({ paymentDate: -1 });
+    } else if (user.role === "worker") {
+      payments = await Payment.find({ worker: user._id })
+        .populate("job", "title date time")
+        .populate("client", "name")
+        .sort({ paymentDate: -1 });
+    } else {
+      return res.status(403).json({ error: "Unauthorized to view payment history" });
+    }
+
+    res.json(payments);
+  } catch (err) {
+    console.error("Error getting payment history:", err);
+    res.status(500).json({ error: err.message });
   }
 };
