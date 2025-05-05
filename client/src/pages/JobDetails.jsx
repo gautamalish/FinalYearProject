@@ -26,6 +26,29 @@ const JobDetails = () => {
   const [isSubmittingReview, setIsSubmittingReview] = useState(false);
   const [reviewError, setReviewError] = useState("");
   const [paymentSuccess, setPaymentSuccess] = useState(false);
+  const [reviews, setReviews] = useState([]);
+  const [isDeletingReview, setIsDeletingReview] = useState(false);
+
+  // Fetch existing reviews
+  useEffect(() => {
+    const fetchReviews = async () => {
+      if (!currentUser || !job?.worker) return;
+
+      try {
+        const token = await currentUser.getIdToken();
+        const response = await axios.get(
+          `http://localhost:3000/api/reviews/worker/${job.worker._id}`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        setReviews(response.data.reviews);
+      } catch (err) {
+        console.error("Error fetching reviews:", err);
+        setReviewError("Failed to load reviews");
+      }
+    };
+
+    fetchReviews();
+  }, [currentUser, job]);
 
   useEffect(() => {
     const fetchJobDetails = async () => {
@@ -333,9 +356,6 @@ const JobDetails = () => {
                   <p className="text-sm text-gray-600 mb-2">
                     Please complete the payment to finalize this job.
                   </p>
-                  <p className="text-sm text-gray-600">
-                    A 10% service fee will be added to the total amount.
-                  </p>
                 </div>
 
                 <StripePaymentButton
@@ -358,7 +378,8 @@ const JobDetails = () => {
                 </div>
               )}
 
-              <div className="space-y-4">
+              {/* Review Form */}
+              <div className="space-y-4 mb-8">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Rating
@@ -410,7 +431,7 @@ const JobDetails = () => {
                       setReviewError("");
 
                       const token = await currentUser.getIdToken();
-                      await axios.post(
+                      const response = await axios.post(
                         "http://localhost:3000/api/reviews/create",
                         {
                           jobId: job._id,
@@ -420,11 +441,8 @@ const JobDetails = () => {
                         { headers: { Authorization: `Bearer ${token}` } }
                       );
 
-                      // Refresh job data to reflect the new review
-                      const updatedJob = await axios.get(`/api/jobs/${jobId}`, {
-                        headers: { Authorization: `Bearer ${token}` },
-                      });
-                      setJob(updatedJob.data);
+                      // Add the new review to the reviews list
+                      setReviews([response.data.review, ...reviews]);
 
                       // Reset review form
                       setReview({ rating: 5, comment: "" });
@@ -443,6 +461,58 @@ const JobDetails = () => {
                 >
                   {isSubmittingReview ? "Submitting..." : "Submit Review"}
                 </button>
+              </div>
+
+              {/* Reviews List */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold text-gray-800 mb-4">
+                  Your Reviews
+                </h3>
+                {reviews.map((review) => (
+                  <div
+                    key={review._id}
+                    className="bg-gray-50 rounded-lg p-4 space-y-2"
+                  >
+                    <div className="flex justify-between items-start">
+                      <div className="flex gap-1">
+                        {[...Array(5)].map((_, index) => (
+                          <FaStar
+                            key={index}
+                            className={`${index < review.rating ? "text-yellow-400" : "text-gray-300"}`}
+                          />
+                        ))}
+                      </div>
+                      <button
+                        onClick={async () => {
+                          try {
+                            setIsDeletingReview(true);
+                            const token = await currentUser.getIdToken();
+                            await axios.delete(
+                              `http://localhost:3000/api/reviews/${review._id}`,
+                              { headers: { Authorization: `Bearer ${token}` } }
+                            );
+                            setReviews(reviews.filter((r) => r._id !== review._id));
+                          } catch (err) {
+                            console.error("Error deleting review:", err);
+                            setReviewError(
+                              "Failed to delete review. Please try again."
+                            );
+                          } finally {
+                            setIsDeletingReview(false);
+                          }
+                        }}
+                        disabled={isDeletingReview}
+                        className="text-red-600 hover:text-red-800 transition-colors"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                    <p className="text-gray-700">{review.comment}</p>
+                    <p className="text-sm text-gray-500">
+                      {new Date(review.createdAt).toLocaleDateString()}
+                    </p>
+                  </div>
+                ))}
               </div>
             </div>
           )}

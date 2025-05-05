@@ -30,14 +30,6 @@ exports.createReview = async (req, res) => {
         .json({ message: "Not authorized to review this job" });
     }
 
-    // Check if review already exists for this job
-    const existingReview = await Review.findOne({ job: jobId });
-    if (existingReview) {
-      return res
-        .status(400)
-        .json({ message: "Review already exists for this job" });
-    }
-
     // Create the review
     const review = new Review({
       worker: job.worker,
@@ -150,7 +142,23 @@ exports.deleteReview = async (req, res) => {
         .json({ message: "Not authorized to delete this review" });
     }
 
-    await review.remove();
+    await Review.findByIdAndDelete(reviewId);
+
+    // Recalculate worker's average rating after deletion
+    const stats = await Review.aggregate([
+      { $match: { worker: review.worker } },
+      { 
+        $group: {
+          _id: "$worker",
+          averageRating: { $avg: "$rating" }
+        }
+      }
+    ]);
+
+    // Update worker's rating
+    await Worker.findByIdAndUpdate(review.worker, {
+      rating: stats.length > 0 ? Math.round(stats[0].averageRating * 10) / 10 : 0
+    });
 
     res.json({ message: "Review deleted successfully" });
   } catch (error) {

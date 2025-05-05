@@ -76,7 +76,7 @@ const StripePaymentButton = ({ job, onPaymentSuccess }) => {
       const paymentIntentResponse = await createPaymentIntent(
         job._id,
         Math.round(paymentDetails.totalAmount * 100), // Convert to cents
-        "usd", // or your preferred currency
+        "nr", // or your preferred currency
         token
       );
 
@@ -144,19 +144,14 @@ const StripePaymentButton = ({ job, onPaymentSuccess }) => {
             <div className="flex justify-between">
               <span className="text-gray-600">Service Amount:</span>
               <span className="font-medium">
-                ${paymentDetails.amount.toFixed(2)}
-              </span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-600">Service Fee (10%):</span>
-              <span className="font-medium">
-                ${paymentDetails.serviceFee.toFixed(2)}
+                Rs {paymentDetails.amount.toFixed(2)}
               </span>
             </div>
             <div className="flex justify-between font-bold">
-              <span>Total Amount:</span>
-              <span>${paymentDetails.totalAmount.toFixed(2)}</span>
+            <span>Total Amount:</span>
+            <span>Rs {paymentDetails.amount.toFixed(2)}</span>
             </div>
+
           </div>
 
           <div className="flex space-x-3">

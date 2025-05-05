@@ -121,7 +121,7 @@ const ClientDashboard = () => {
                     <div className="flex flex-col space-y-2">
                       <button
                         onClick={() => navigate(`/job-details/${job._id}`)}
-                        className="w-full px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                        className="w-full px-4 py-2 bg-slate-500 text-white rounded-md hover:bg-slate-700 transition-colors"
                       >
                         View Details
                       </button>
@@ -129,9 +129,8 @@ const ClientDashboard = () => {
                       {job.status === 'completed' && job.paymentStatus === 'pending' && (
                         <button
                           onClick={() => navigate(`/payment/${job._id}`)}
-                          className="w-full px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors flex items-center justify-center"
+                          className="w-full px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors flex items-center justify-center"
                         >
-                          <FaDollarSign className="mr-2" />
                           Pay Now (Rs. {job.totalAmount})
                         </button>
                       )}
