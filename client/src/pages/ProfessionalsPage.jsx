@@ -85,25 +85,31 @@ const ProfessionalsPage = () => {
         </div>
 
         <div className="max-w-4xl mx-auto mb-8">
-          <div className="flex items-center justify-between mb-4">
-            <input
-              type="text"
-              placeholder="Search professionals..."
-              className="w-full max-w-md px-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              value={filters.searchTerm}
-              onChange={(e) => {
-                setFilters({ ...filters, searchTerm: e.target.value });
-                const filtered = workers.filter(worker =>
-                  worker.name.toLowerCase().includes(e.target.value.toLowerCase()) &&
-                  worker.rating >= filters.minRating &&
-                  worker.hourlyRate <= filters.maxHourlyRate
-                );
-                setFilteredWorkers(filtered);
-              }}
-            />
+          <div className="flex flex-col md:flex-row gap-4 items-stretch">
+            <div className="flex-1">
+              <input
+                type="text"
+                placeholder="Search professionals..."
+                className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 h-full"
+                value={filters.searchTerm}
+                onChange={(e) => {
+                  setFilters({ ...filters, searchTerm: e.target.value });
+                  const searchTerm = e.target.value.toLowerCase();
+                  const filtered = workers.filter(worker =>
+                    (worker.name?.toLowerCase().includes(searchTerm) ||
+                    worker.title?.toLowerCase().includes(searchTerm) ||
+                    worker.bio?.toLowerCase().includes(searchTerm) ||
+                    worker.categories?.some(category => category.name.toLowerCase().includes(searchTerm))) &&
+                    worker.rating >= filters.minRating &&
+                    worker.hourlyRate <= filters.maxHourlyRate
+                  );
+                  setFilteredWorkers(filtered);
+                }}
+              />
+            </div>
             <button
               onClick={() => setShowFilters(!showFilters)}
-              className="ml-4 px-4 py-2 flex items-center text-gray-700 hover:text-blue-600 transition-colors"
+              className={`px-6 py-3 flex items-center justify-center rounded-lg transition-colors ${showFilters ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
             >
               <FaFilter className="mr-2" />
               Filters
@@ -111,14 +117,14 @@ const ProfessionalsPage = () => {
           </div>
 
           {showFilters && (
-            <div className="bg-white p-6 rounded-lg shadow-lg mb-6">
+            <div className="mt-4 bg-white p-6 rounded-lg shadow-lg">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium text-gray-700">
                     Minimum Rating
                   </label>
                   <select
-                    className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
                     value={filters.minRating}
                     onChange={(e) => {
                       const newValue = parseFloat(e.target.value);
@@ -138,12 +144,12 @@ const ProfessionalsPage = () => {
                     ))}
                   </select>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium text-gray-700">
                     Maximum Hourly Rate (RM)
                   </label>
                   <select
-                    className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
                     value={filters.maxHourlyRate}
                     onChange={(e) => {
                       const newValue = parseInt(e.target.value);
