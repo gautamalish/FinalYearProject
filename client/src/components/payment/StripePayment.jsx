@@ -76,7 +76,7 @@ const StripePaymentButton = ({ job, onPaymentSuccess }) => {
       const paymentIntentResponse = await createPaymentIntent(
         job._id,
         Math.round(paymentDetails.totalAmount * 100), // Convert to cents
-        "nr", // or your preferred currency
+        "inr", 
         token
       );
 

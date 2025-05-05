@@ -131,7 +131,7 @@ const ClientDashboard = () => {
                           onClick={() => navigate(`/payment/${job._id}`)}
                           className="w-full px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors flex items-center justify-center"
                         >
-                          Pay Now (Rs. {job.totalAmount})
+                          Pay Now (Rs. {Math.max(100, job.totalAmount)})
                         </button>
                       )}
                     </div>

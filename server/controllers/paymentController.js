@@ -165,7 +165,19 @@ exports.getPaymentDetails = async (req, res) => {
     }
 
     // Calculate payment details
-    const amount = job.totalAmount || (job.hourlyRate * (job.duration || 1));
+    let amount;
+    if (job.startTime && job.endTime) {
+      const durationInMinutes = (new Date(job.endTime) - new Date(job.startTime)) / (1000 * 60);
+      if (durationInMinutes < 1) {
+        // If duration is less than 1 minute, charge only travel fee
+        amount = 100; // Rs 100 travel fee
+      } else {
+        // Calculate based on hourly rate and actual duration
+        amount = job.totalAmount || (job.hourlyRate * (job.duration || 1));
+      }
+    } else {
+      amount = job.totalAmount || (job.hourlyRate * (job.duration || 1));
+    }
     const serviceFee = amount * 0.10; // 10% service fee
     const totalAmount = amount + serviceFee;
 

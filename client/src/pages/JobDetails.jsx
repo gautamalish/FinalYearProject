@@ -176,6 +176,7 @@ const JobDetails = () => {
     setJob((prev) => ({ ...prev, paymentStatus: "paid" }));
     // Show success message for 3 seconds
     setTimeout(() => setPaymentSuccess(false), 3000);
+    navigate("/dashboard")
   };
 
   return (

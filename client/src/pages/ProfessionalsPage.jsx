@@ -19,7 +19,7 @@ const ProfessionalsPage = () => {
   });
   
   // Rating and hourly rate options for select boxes
-  const ratingOptions = [0, 1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5];
+  const ratingOptions = [0, 1, 2, 3, 4, 5];
   const hourlyRateOptions = [100, 200, 300, 400, 500, 600, 700, 800, 900, 1000];
   const [showFilters, setShowFilters] = useState(false);
 

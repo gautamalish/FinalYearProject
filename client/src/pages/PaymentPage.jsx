@@ -20,6 +20,7 @@ const PaymentPage = () => {
   const navigate = useNavigate();
   const { currentUser, mongoUser } = useAuth();
   const [job, setJob] = useState(null);
+  const [paymentDetails, setPaymentDetails] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [paymentSuccess, setPaymentSuccess] = useState(false);
@@ -50,36 +51,42 @@ const PaymentPage = () => {
       return;
     }
 
-    const fetchJobDetails = async () => {
+    const fetchJobAndPaymentDetails = async () => {
       try {
         setLoading(true);
         const token = await currentUser.getIdToken();
-        const response = await axios.get(`/api/jobs/${jobId}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        
+        // Fetch both job details and payment details in parallel
+        const [jobResponse, paymentDetails] = await Promise.all([
+          axios.get(`/api/jobs/${jobId}`, {
+            headers: { Authorization: `Bearer ${token}` },
+          }),
+          getPaymentDetails(jobId, token)
+        ]);
 
-        setJob(response.data);
+        setJob(jobResponse.data);
+        setPaymentDetails(paymentDetails);
 
         // Redirect if job is not completed or already paid
         if (
-          response.data.status !== "completed" ||
-          response.data.paymentStatus !== "pending"
+          jobResponse.data.status !== "completed" ||
+          jobResponse.data.paymentStatus !== "pending"
         ) {
-          navigate("/client-dashboard");
+          navigate("/dashboard");
         }
       } catch (err) {
-        console.error("Error fetching job details:", err);
-        setError(err.response?.data?.message || "Failed to load job details");
+        console.error("Error fetching details:", err);
+        setError(err.response?.data?.message || "Failed to load details");
       } finally {
         setLoading(false);
       }
     };
 
-    fetchJobDetails();
+    fetchJobAndPaymentDetails();
   }, [currentUser, mongoUser, jobId, navigate]);
 
   const handlePayment = async () => {
-    if (!stripe || !job) return;
+    if (!stripe || !job || !paymentDetails) return;
 
     setProcessingPayment(true);
     setError("");
@@ -87,24 +94,21 @@ const PaymentPage = () => {
     try {
       const token = await currentUser.getIdToken();
 
-      // Get payment details first
-      const paymentDetails = await getPaymentDetails(job._id, token);
-      
-      // Step 1: Create payment intent on your backend
+      // Create payment intent with the exact amount from paymentDetails
       const paymentIntentResponse = await createPaymentIntent(
         job._id,
-        Math.round(paymentDetails.totalAmount * 100), // Convert to cents
-        "usd", // or your preferred currency
+        Math.round(paymentDetails.amount * 100), // Using paymentDetails.amount instead of totalAmount
+        "inr",
         token
       );
 
       const { clientSecret, paymentIntentId } = paymentIntentResponse;
 
-      // Step 2: Use Stripe Elements to collect payment method and confirm payment
+      // Confirm payment with Stripe
       const { error, paymentIntent } = await stripe.confirmCardPayment(clientSecret, {
         payment_method: {
           card: {
-            token: 'tok_visa', // Use a test token for development
+            token: 'tok_visa', // Test token
           },
           billing_details: {
             name: currentUser.displayName || 'Customer',
@@ -117,16 +121,14 @@ const PaymentPage = () => {
         throw error;
       }
 
-      // Step 3: Confirm the payment with our backend
+      // Confirm payment with backend
       await confirmPayment(paymentIntentId, job._id, token);
 
-      // If we get here, payment was successful
       setPaymentSuccess(true);
       setJob((prev) => ({ ...prev, paymentStatus: "paid" }));
 
-      // Redirect after 3 seconds
       setTimeout(() => {
-        navigate("/client-dashboard");
+        navigate("/dashboard");
       }, 3000);
     } catch (err) {
       console.error("Payment error:", err);
@@ -162,12 +164,12 @@ const PaymentPage = () => {
     );
   }
 
-  if (!job) {
+  if (!job || !paymentDetails) {
     return (
       <div className="min-h-screen bg-gray-50 p-6">
         <div className="max-w-2xl mx-auto bg-white rounded-xl shadow-md p-6">
           <div className="text-center text-gray-600">
-            <p>Job not found</p>
+            <p>Job details not found</p>
             <button
               onClick={() => navigate("/client-dashboard")}
               className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
@@ -183,36 +185,20 @@ const PaymentPage = () => {
   return (
     <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-3xl mx-auto">
-        {/* Back button */}
-        <button
-          onClick={() => navigate("/client-dashboard")}
-          className="mb-6 flex items-center text-blue-600 hover:text-blue-800 transition-colors"
-        >
-          <FaArrowLeft className="mr-2" />
-          Back to Dashboard
-        </button>
-
-        {/* Payment success message */}
         {paymentSuccess && (
-          <div
-            className="mb-6 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative"
-            role="alert"
-          >
+          <div className="mb-6 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative">
             <strong className="font-bold">Success!</strong>
             <span className="block sm:inline">
-              {" "}
               Payment completed successfully. Redirecting to dashboard...
             </span>
           </div>
         )}
 
         <div className="bg-white rounded-xl shadow-md overflow-hidden">
-          {/* Header */}
           <div className="bg-blue-600 px-6 py-4 text-white">
             <h1 className="text-2xl font-bold">Payment for Service</h1>
           </div>
 
-          {/* Job details */}
           <div className="p-6">
             <h2 className="text-xl font-semibold text-gray-800 mb-4">
               {job.title}
@@ -252,8 +238,7 @@ const PaymentPage = () => {
                 <div className="flex items-center text-gray-600 font-semibold">
                   <FaDollarSign className="text-blue-500 mr-2" />
                   <span>
-                    Total Amount: Rs.{" "}
-                    {job.totalAmount || job.hourlyRate * (job.duration || 1)}
+                    Total Amount: Rs. {paymentDetails.amount.toFixed(2)}
                   </span>
                 </div>
               </div>
@@ -264,11 +249,9 @@ const PaymentPage = () => {
                 Complete Your Payment
               </h3>
               <p className="text-gray-600 mb-6">
-                Please complete the payment to finalize this service. The
-                payment will be securely processed through Stripe.
+                Please complete the payment to finalize this service.
               </p>
 
-              {/* Payment button */}
               <div className="mt-4">
                 <button
                   onClick={handlePayment}
