@@ -10,6 +10,23 @@ import {
   signInWithPopup,
 } from "firebase/auth";
 
+// ✅ Friendly error mapping
+const getFriendlyAuthError = (code) => {
+  const map = {
+    "auth/invalid-email": "The email address is badly formatted.",
+    "auth/user-disabled": "This account has been disabled. Contact support.",
+    "auth/user-not-found": "No account found with this email.",
+    "auth/wrong-password": "Incorrect password. Try again.",
+    "auth/missing-password": "Please enter your password.",
+    "auth/too-many-requests":
+      "Too many failed attempts. Try again later or reset your password.",
+    "auth/invalid-credential": "Invalid email or password.",
+    "auth/network-request-failed":
+      "Network error. Please check your connection.",
+  };
+  return map[code] || "An unexpected error occurred. Please try again.";
+};
+
 const SignIn = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -56,23 +73,16 @@ const SignIn = () => {
         headers: { Authorization: `Bearer ${token}` },
       });
 
-      // Redirect based on role
       if (response.data.data.role === "admin") {
         navigate("/admin");
       } else {
         navigate("/");
       }
     } catch (error) {
-      if (
-        !["auth/cancelled-popup-request", "auth/popup-closed-by-user"].includes(
-          error.code
-        )
-      ) {
-        const errorMessage = error.code
-          ? error.code.replace("auth/", "").replace(/-/g, " ")
-          : "Failed to sign in with Google";
-        setError(errorMessage);
-      }
+      const errorMessage = error.code
+        ? getFriendlyAuthError(error.code)
+        : "Failed to sign in with Google";
+      setError(errorMessage);
     } finally {
       setGoogleLoading(false);
       setVerifyingAdmin(false);
@@ -90,6 +100,12 @@ const SignIn = () => {
         formData.password
       );
 
+      if (!userCredential.user.emailVerified) {
+        setError("Please verify your email before signing in.");
+        setIsLoading(false);
+        return;
+      }
+
       const token = await userCredential.user.getIdToken();
       localStorage.setItem("token", token);
 
@@ -97,20 +113,16 @@ const SignIn = () => {
       const response = await axios.get("/api/users/me", {
         headers: { Authorization: `Bearer ${token}` },
       });
-      console.log("Response:",response.data.data.role);
-      // Redirect based on role
+
       if (response.data.data.role === "admin") {
         navigate("/admin");
       } else {
         navigate("/");
       }
     } catch (error) {
-      let errorMessage = "Sign in failed";
-      if (error.code) {
-        errorMessage = error.code.replace("auth/", "").replace(/-/g, " ");
-      } else if (error.response?.data?.error) {
-        errorMessage = error.response.data.error;
-      }
+      const errorMessage = error.code
+        ? getFriendlyAuthError(error.code)
+        : error.response?.data?.error || "Sign in failed. Please try again.";
       setError(errorMessage);
     } finally {
       setIsLoading(false);
@@ -121,7 +133,6 @@ const SignIn = () => {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full bg-white rounded-2xl shadow-xl overflow-hidden p-8 space-y-8">
-        {/* Loading indicator */}
         {(isLoading || verifyingAdmin) && (
           <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
             <div className="bg-white p-6 rounded-lg shadow-lg">
@@ -135,7 +146,6 @@ const SignIn = () => {
           </div>
         )}
 
-        {/* Logo Header */}
         <div className="text-center">
           <h1 className="text-4xl font-bold text-gray-900">
             <span className="text-yellow-400">Hire</span>Me
@@ -145,20 +155,15 @@ const SignIn = () => {
           </h2>
         </div>
 
-        {/* Error Message */}
         {error && (
           <div className="bg-red-50 text-red-600 p-3 rounded-lg text-sm">
-            {error.charAt(0).toUpperCase() + error.slice(1)}
+            {error}
           </div>
         )}
 
-        {/* Form */}
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
           <div className="rounded-md shadow-sm space-y-4">
             <div>
-              <label htmlFor="email" className="sr-only">
-                Email address
-              </label>
               <input
                 id="email"
                 name="email"
@@ -172,9 +177,6 @@ const SignIn = () => {
               />
             </div>
             <div>
-              <label htmlFor="password" className="sr-only">
-                Password
-              </label>
               <input
                 id="password"
                 name="password"
@@ -234,7 +236,6 @@ const SignIn = () => {
           </div>
         </form>
 
-        {/* Divider */}
         <div className="relative">
           <div className="absolute inset-0 flex items-center">
             <div className="w-full border-t border-gray-300" />
@@ -246,7 +247,6 @@ const SignIn = () => {
           </div>
         </div>
 
-        {/* Google Sign In */}
         <div>
           <button
             onClick={loginWithGoogle}
@@ -264,7 +264,6 @@ const SignIn = () => {
           </button>
         </div>
 
-        {/* Sign Up Link */}
         <div className="text-center text-sm text-gray-600">
           Don't have an account?{" "}
           <button

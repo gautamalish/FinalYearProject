@@ -9,6 +9,7 @@ import {
 } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import { auth } from "../config/firebase-config";
+import { sendEmailVerification } from "firebase/auth";
 import {
   getAuth,
   GoogleAuthProvider,
@@ -37,32 +38,44 @@ const SignUp = () => {
   };
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
-    try {
-      // 1. Firebase Authentication
-      const userCredential = await createUserWithEmailAndPassword(
-        auth,
-        formData.email,
-        formData.password
-      );
-      const user = userCredential.user;
-      const token = await user.getIdToken();
+  e.preventDefault();
+  setIsLoading(true);
+  setError("");
 
-      // 2. Save to MongoDB
-      await axios.post("http://localhost:3000/api/users", {
-        token,
-        firebaseUID: user.uid,
-        name: formData.name,
-        email: formData.email,
-        phone: formData.phone,
-        role: "client"
-      });
+  try {
+    // 1. Create user
+    const userCredential = await createUserWithEmailAndPassword(
+      auth,
+      formData.email,
+      formData.password
+    );
+    const user = userCredential.user;
 
-      navigate("/");
-    } catch (error) {
-      console.error("Error:", error.message);
-    }
-  };
+    // 2. Send email verification
+    await sendEmailVerification(user);
+
+    const token = await user.getIdToken();
+
+    // 3. Save user in MongoDB
+    await axios.post("http://localhost:3000/api/users", {
+      token,
+      firebaseUID: user.uid,
+      name: formData.name,
+      email: formData.email,
+      phone: formData.phone,
+      role: "client",
+    });
+
+    // 4. Redirect or show message
+    alert("Verification email sent. Please check your inbox.");
+    navigate("/signin");
+  } catch (error) {
+    console.error("Signup Error:", error.message);
+    setError(error.message);
+  } finally {
+    setIsLoading(false);
+  }
+};
 
   const signUpWithGoogle = async () => {
     setGoogleLoading(true);
@@ -82,7 +95,7 @@ const SignUp = () => {
         name: user.displayName,
         email: user.email,
         phone: user.phoneNumber || "", // Google might not provide a phone number
-        role: "client"
+        role: "client",
       });
 
       navigate("/");
