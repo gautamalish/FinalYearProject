@@ -1,6 +1,7 @@
 // server.js
 const express = require("express");
 require("dotenv").config();
+
 const cors = require("cors");
 const admin = require("firebase-admin");
 const mongoose = require("mongoose");
@@ -14,7 +15,7 @@ const Category = require("./models/CategoryModel");
 const multer = require("multer");
 const upload = multer({ storage });
 const app = express();
-
+app.use(express.json());
 // Middleware
 const corsOptions = {
   origin: "http://localhost:5173", // Explicitly set your frontend origin
@@ -28,7 +29,6 @@ app.use(cors(corsOptions));
 
 // Handle preflight requests
 app.options("*", cors(corsOptions));
-app.use(express.json());
 
 // Initialize Firebase Admin
 const serviceAccount = require("./serviceAccountKey.json");
