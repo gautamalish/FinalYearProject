@@ -19,6 +19,7 @@ import PaymentPage from "./pages/PaymentPage";
 import { NotificationProvider } from "./contexts/NotificationContext";
 import { loadStripe } from "@stripe/stripe-js";
 import { Elements } from "@stripe/react-stripe-js";
+import ForgotPassword from "./pages/ForgotPassword";
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLIC_KEY);
 // This component will be rendered inside BrowserRouter
@@ -42,6 +43,7 @@ function App() {
             <Routes>
               <Route path="/" element={<Home />} />
               <Route path="/signin" element={<SignIn />} />
+              <Route path="/forgot-password" element={<ForgotPassword />} />
               <Route path="/error" element={<ErrorPage />} />
               <Route path="/signup" element={<SignUp />} />
               <Route path="/services" element={<ServicesPage />} />
