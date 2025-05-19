@@ -450,135 +450,125 @@ const AdminDashboard = () => {
             </div>
 
             {/* Categories List */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {categories.map((category) =>
-                editingCategory?._id === category._id ? (
-                  <div
-                    key={category._id}
-                    className="border rounded-lg overflow-hidden shadow-sm p-4 bg-gray-50"
-                  >
-                    <div className="h-40 bg-gray-200 overflow-hidden mb-4">
-                      <img
-                        src={
-                          editingCategory.thumbnailPreview ||
-                          editingCategory.thumbnail?.url ||
-                          editingCategory.thumbnail ||
-                          "https://via.placeholder.com/150"
-                        }
-                        alt={editingCategory.name}
-                        className="w-full h-full object-cover"
-                        onError={(e) => {
-                          e.target.src = "https://via.placeholder.com/150";
-                        }}
-                      />
-                    </div>
-                    <div className="space-y-3">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Name
-                        </label>
-                        <input
-                          type="text"
-                          value={editingCategory.name}
-                          onChange={(e) =>
-                            setEditingCategory({
-                              ...editingCategory,
-                              name: e.target.value,
-                            })
-                          }
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Description
-                        </label>
-                        <input
-                          type="text"
-                          value={editingCategory.description}
-                          onChange={(e) =>
-                            setEditingCategory({
-                              ...editingCategory,
-                              description: e.target.value,
-                            })
-                          }
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Thumbnail
-                        </label>
-                        <input
-                          type="file"
-                          onChange={handleImageChange}
-                          accept="image/*"
-                          className="w-full text-sm"
-                        />
-                      </div>
-                      <div className="flex justify-end gap-2">
-                        <button
-                          onClick={cancelEditing}
-                          className="px-3 py-1 bg-gray-300 rounded"
-                        >
-                          <FaTimes />
-                        </button>
-                        <button
-                          onClick={handleUpdateCategory}
-                          disabled={loading}
-                          className="px-3 py-1 bg-blue-600 text-white rounded"
-                        >
-                          {loading ? "Saving..." : <FaSave />}
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <div
-                    key={category._id}
-                    className="border rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow"
-                  >
-                    <div className="h-40 bg-gray-200 overflow-hidden">
-                      <img
-                        src={
-                          category.thumbnail?.url ||
-                          category.thumbnail ||
-                          "/fallback.png"
-                        }
-                        alt="category thumbnail"
-                        className="w-full h-full object-cover"
-                        onError={(e) => {
-                          if (!e.target.src.includes("fallback.png")) {
-                            e.target.src = "/fallback.png";
-                          }
-                        }}
-                      />
-                    </div>
-                    <div className="p-4">
-                      <h3 className="font-bold text-lg text-gray-800 mb-1">
-                        {category.name}
-                      </h3>
-                      <p className="text-gray-600 text-sm mb-3">
-                        {category.description}
-                      </p>
-                      <div className="flex justify-end gap-2">
-                        <button
-                          onClick={() => startEditingCategory(category)}
-                          className="text-blue-600 hover:text-blue-800 p-2"
-                        >
-                          <FaEdit />
-                        </button>
-                        <button
-                          onClick={() => handleDeleteCategory(category._id)}
-                          className="text-red-600 hover:text-red-800 p-2"
-                        >
-                          <FaTrash />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                )
-              )}
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Thumbnail
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Name
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Description
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {categories.map((category) =>
+                    editingCategory?._id === category._id ? (
+                      <tr key={category._id}>
+                        <td className="px-6 py-4">
+                          <img
+                            src={
+                              editingCategory.thumbnailPreview ||
+                              editingCategory.thumbnail?.url ||
+                              editingCategory.thumbnail ||
+                              "https://via.placeholder.com/50"
+                            }
+                            alt={editingCategory.name}
+                            className="h-12 w-12 object-cover rounded"
+                          />
+                          <input
+                            type="file"
+                            onChange={handleImageChange}
+                            accept="image/*"
+                            className="mt-1"
+                          />
+                        </td>
+                        <td className="px-6 py-4">
+                          <input
+                            type="text"
+                            value={editingCategory.name}
+                            onChange={(e) =>
+                              setEditingCategory({
+                                ...editingCategory,
+                                name: e.target.value,
+                              })
+                            }
+                            className="border rounded px-2 py-1 w-full"
+                          />
+                        </td>
+                        <td className="px-6 py-4">
+                          <input
+                            type="text"
+                            value={editingCategory.description}
+                            onChange={(e) =>
+                              setEditingCategory({
+                                ...editingCategory,
+                                description: e.target.value,
+                              })
+                            }
+                            className="border rounded px-2 py-1 w-full"
+                          />
+                        </td>
+                        <td className="px-6 py-4 flex gap-2">
+                          <button
+                            onClick={handleUpdateCategory}
+                            className="text-green-600 hover:text-green-800"
+                          >
+                            <FaSave />
+                          </button>
+                          <button
+                            onClick={cancelEditing}
+                            className="text-gray-600 hover:text-gray-800"
+                          >
+                            <FaTimes />
+                          </button>
+                        </td>
+                      </tr>
+                    ) : (
+                      <tr key={category._id}>
+                        <td className="px-6 py-4">
+                          <img
+                            src={
+                              category.thumbnail?.url ||
+                              category.thumbnail ||
+                              "https://via.placeholder.com/50"
+                            }
+                            alt={category.name}
+                            className="h-12 w-12 object-cover rounded"
+                          />
+                        </td>
+                        <td className="px-6 py-4 text-sm font-medium text-gray-900">
+                          {category.name}
+                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-500">
+                          {category.description}
+                        </td>
+                        <td className="px-6 py-4 flex gap-2">
+                          <button
+                            onClick={() => startEditingCategory(category)}
+                            className="text-blue-600 hover:text-blue-800"
+                          >
+                            <FaEdit />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteCategory(category._id)}
+                            className="text-red-600 hover:text-red-800"
+                          >
+                            <FaTrash />
+                          </button>
+                        </td>
+                      </tr>
+                    )
+                  )}
+                </tbody>
+              </table>
             </div>
           </div>
         )}

@@ -27,7 +27,9 @@ const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLIC_KEY);
 const HeaderWithConditionalRendering = () => {
   const location = useLocation();
   const isAuthPage =
-    location.pathname === "/signin" || location.pathname === "/signup";
+    location.pathname === "/signin" ||
+    location.pathname === "/signup" ||
+    location.pathname === "/admin";
 
   // Only render the Header when not on auth pages
   return !isAuthPage ? <Header /> : null;
